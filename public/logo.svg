@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="silver" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8e8e8;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#b0b0b0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#888888;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="silverDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#aaaaaa;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#cccccc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#666666;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- A shape - left leg -->
+  <polygon points="20,160 60,40 85,40 50,160" fill="url(#silver)"/>
+  <!-- A shape - right leg -->
+  <polygon points="180,160 140,40 115,40 150,160" fill="url(#silverDark)"/>
+  <!-- A shape - crossbar -->
+  <polygon points="58,110 142,110 135,130 65,130" fill="url(#silver)"/>
+  <!-- Gap in crossbar (makes it look like the logo) -->
+  <polygon points="72,110 128,110 121,130 79,130" fill="#111111"/>
+</svg>

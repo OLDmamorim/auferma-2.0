@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -34,13 +35,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg">
-            <svg className="w-9 h-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+          <div className="inline-flex items-center justify-center mb-3">
+            <Image
+              src="/logo.png"
+              alt="Auferma"
+              width={120}
+              height={120}
+              className="object-contain drop-shadow-lg"
+              onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
+            />
           </div>
-          <h1 className="text-2xl font-bold text-white">Auferma CI</h1>
-          <p className="text-blue-200 text-sm mt-1">Commercial Intelligence Platform</p>
+          <p className="text-blue-200 text-xs tracking-widest uppercase mt-1">Commercial Intelligence Platform</p>
         </div>
 
         {/* Card */}
