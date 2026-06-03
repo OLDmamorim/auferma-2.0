@@ -1,6 +1,5 @@
 'use client'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 
@@ -73,13 +72,13 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       {/* Brand */}
       <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="relative w-8 h-8 flex-shrink-0">
-            <Image
+          <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/logo.png.png"
               alt="Auferma"
-              fill
-              className="object-contain"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              className="w-8 h-8 object-contain"
+              onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
             />
           </div>
           <div>

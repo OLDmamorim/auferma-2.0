@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -36,12 +35,12 @@ export default function LoginPage() {
         {/* Logo/Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4 bg-white rounded-2xl px-8 py-5 shadow-2xl">
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/logo.png.png"
               alt="Auferma"
               width={220}
-              height={110}
-              className="object-contain"
+              className="object-contain max-h-24"
               onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
             />
           </div>
