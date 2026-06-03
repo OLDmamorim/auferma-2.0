@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
 // Protected by SEED_SECRET env var - call with ?secret=YOUR_SECRET
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const secret = searchParams.get('secret')
 
