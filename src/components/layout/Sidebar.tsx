@@ -75,7 +75,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         <div className="flex items-center gap-3">
           <div className="relative w-8 h-8 flex-shrink-0">
             <Image
-              src="/logo.png"
+              src="/logo.png.png"
               alt="Auferma"
               fill
               className="object-contain"

@@ -37,7 +37,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4 bg-white rounded-2xl px-8 py-5 shadow-2xl">
             <Image
-              src="/logo.png"
+              src="/logo.png.png"
               alt="Auferma"
               width={220}
               height={110}
