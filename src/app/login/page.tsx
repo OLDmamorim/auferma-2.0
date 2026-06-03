@@ -35,17 +35,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-3">
+          <div className="inline-flex items-center justify-center mb-4 bg-white rounded-2xl px-8 py-5 shadow-2xl">
             <Image
               src="/logo.png"
               alt="Auferma"
-              width={120}
-              height={120}
-              className="object-contain drop-shadow-lg"
+              width={220}
+              height={110}
+              className="object-contain"
               onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
             />
           </div>
-          <p className="text-blue-200 text-xs tracking-widest uppercase mt-1">Commercial Intelligence Platform</p>
+          <p className="text-blue-200/70 text-xs tracking-widest uppercase mt-1">Commercial Intelligence Platform</p>
         </div>
 
         {/* Card */}
