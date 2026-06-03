@@ -8,6 +8,7 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+  SEED_SECRET = "auferma2024seed"
 
 [[headers]]
   for = "/*"
