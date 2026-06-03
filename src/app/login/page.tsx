@@ -34,13 +34,19 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4 bg-white rounded-2xl px-6 py-4 shadow-2xl w-full">
+          <div className="flex items-center justify-center mb-4 w-full">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png.png"
               alt="Auferma"
-              className="w-full max-h-28 object-contain"
-              onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
+              className="w-72 max-h-36 object-contain"
+              style={{ mixBlendMode: 'screen', filter: 'invert(1) brightness(1.4)' }}
+              onError={(e) => {
+                const el = e.target as HTMLImageElement
+                el.style.mixBlendMode = 'normal'
+                el.style.filter = 'none'
+                el.src = '/logo.svg'
+              }}
             />
           </div>
           <p className="text-blue-200/70 text-xs tracking-widest uppercase mt-1">Commercial Intelligence Platform</p>

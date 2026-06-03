@@ -70,17 +70,20 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const content = (
     <aside className="h-full w-64 bg-[#0f1f35] flex flex-col">
       {/* Brand */}
-      <div className="border-b border-white/10">
-        {/* Logo fills the header */}
-        <div className="bg-white mx-3 mt-3 mb-3 rounded-xl overflow-hidden flex items-center justify-center px-3 py-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png.png"
-            alt="Auferma"
-            className="w-full max-h-14 object-contain"
-            onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
-          />
-        </div>
+      <div className="px-4 pt-4 pb-3 border-b border-white/10 relative">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.png.png"
+          alt="Auferma"
+          className="w-full max-h-16 object-contain"
+          style={{ mixBlendMode: 'screen', filter: 'invert(1) brightness(1.5)' }}
+          onError={(e) => {
+            const el = e.target as HTMLImageElement
+            el.style.mixBlendMode = 'normal'
+            el.style.filter = 'none'
+            el.src = '/logo.svg'
+          }}
+        />
         {/* Close button — mobile only */}
         {onClose && (
           <button onClick={onClose} className="absolute top-3 right-3 md:hidden text-slate-400 hover:text-white p-1">
