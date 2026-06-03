@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DIRECTOR
+  COMMERCIAL
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  AT_RISK
+  PROSPECT
+}
+
+enum CustomerType {
+  KEY_ACCOUNT
+  STANDARD
+  SMALL
+  PROSPECT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ContactType {
+  VISIT
+  CALL
+  EMAIL
+  WHATSAPP
+  OTHER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          Role      @default(COMMERCIAL)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  customers     Customer[]
+  tasks         Task[]    @relation("AssignedTasks")
+  createdTasks  Task[]    @relation("CreatedTasks")
+  visits        Visit[]
+  targets       CommercialTarget[]
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  products    Product[]
+  sales       Sale[]
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  sku         String?   @unique
+  brandId     String
+  brand       Brand     @relation(fields: [brandId], references: [id])
+  price       Float?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  saleItems   SaleItem[]
+}
+
+model Customer {
+  id                String         @id @default(cuid())
+  name              String
+  nif               String?        @unique
+  zone              String?
+  address           String?
+  phone             String?
+  email             String?
+  commercialId      String?
+  commercial        User?          @relation(fields: [commercialId], references: [id])
+  type              CustomerType   @default(STANDARD)
+  status            CustomerStatus @default(ACTIVE)
+  riskScore         Float          @default(0)
+  potentialScore    Float          @default(0)
+  lastPurchaseDate  DateTime?
+  lastVisitDate     DateTime?
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  sales             Sale[]
+  tasks             Task[]
+  visits            Visit[]
+  scores            CustomerScore[]
+  recommendations   AiRecommendation[]
+}
+
+model Sale {
+  id           String     @id @default(cuid())
+  customerId   String
+  customer     Customer   @relation(fields: [customerId], references: [id])
+  brandId      String?
+  brand        Brand?     @relation(fields: [brandId], references: [id])
+  commercialId String?
+  date         DateTime
+  total        Float
+  margin       Float?
+  items        SaleItem[]
+  createdAt    DateTime   @default(now())
+}
+
+model SaleItem {
+  id        String   @id @default(cuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  total     Float
+}
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  customerId   String?
+  customer     Customer?    @relation(fields: [customerId], references: [id])
+  assignedToId String?
+  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  createdById  String?
+  createdBy    User?        @relation("CreatedTasks", fields: [createdById], references: [id])
+  status       TaskStatus   @default(PENDING)
+  priority     TaskPriority @default(MEDIUM)
+  dueDate      DateTime?
+  completedAt  DateTime?
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Visit {
+  id           String      @id @default(cuid())
+  customerId   String
+  customer     Customer    @relation(fields: [customerId], references: [id])
+  commercialId String?
+  commercial   User?       @relation(fields: [commercialId], references: [id])
+  date         DateTime
+  type         ContactType @default(VISIT)
+  result       String?
+  nextAction   String?
+  notes        String?
+  createdAt    DateTime    @default(now())
+}
+
+model CommercialTarget {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  year      Int
+  month     Int
+  target    Float
+  achieved  Float    @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, year, month])
+}
+
+model CustomerScore {
+  id             String   @id @default(cuid())
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id])
+  riskScore      Float    @default(0)
+  potentialScore Float    @default(0)
+  calculatedAt   DateTime @default(now())
+}
+
+model AiRecommendation {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  type        String
+  title       String
+  description String
+  priority    Int      @default(1)
+  dismissed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Import {
+  id        String   @id @default(cuid())
+  type      String
+  filename  String
+  status    String   @default("pending")
+  records   Int      @default(0)
+  errors    Int      @default(0)
+  createdAt DateTime @default(now())
+}

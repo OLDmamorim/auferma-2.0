@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #f9fafb;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.sidebar-link {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150;
+}
+.sidebar-link:hover {
+  @apply bg-white/10 text-white;
+}
+.sidebar-link.active {
+  @apply bg-blue-600 text-white;
+}
+.sidebar-link.inactive {
+  @apply text-slate-300;
+}
+
+.kpi-card {
+  @apply bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow;
+}
+
+.data-table {
+  @apply w-full text-sm;
+}
+.data-table th {
+  @apply text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 px-4 bg-gray-50 border-b border-gray-100;
+}
+.data-table td {
+  @apply py-3 px-4 border-b border-gray-50 text-gray-700;
+}
+.data-table tr:hover td {
+  @apply bg-blue-50/30;
+}
+
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+}
+.badge-green { @apply bg-green-100 text-green-700; }
+.badge-red { @apply bg-red-100 text-red-700; }
+.badge-orange { @apply bg-orange-100 text-orange-700; }
+.badge-blue { @apply bg-blue-100 text-blue-700; }
+.badge-gray { @apply bg-gray-100 text-gray-600; }
