@@ -13,29 +13,37 @@ export async function GET() {
 
   const commercials = await prisma.user.findMany({
     where: { role: 'COMMERCIAL', active: true },
-    select: {
-      id: true, name: true,
-      sales: {
-        where: { date: { gte: startOfMonth } },
-        select: { total: true },
-      },
-      tasks: {
-        where: { status: 'COMPLETED', completedAt: { gte: startOfMonth }, _: undefined } as any,
-        select: { id: true },
-      },
-      visits: {
-        where: { date: { gte: startOfMonth } },
-        select: { id: true },
-      },
-    },
+    select: { id: true, name: true },
   })
+
+  const [salesByCommercial, tasksByCommercial, visitsByCommercial] = await Promise.all([
+    prisma.sale.groupBy({
+      by: ['commercialId'],
+      where: { date: { gte: startOfMonth }, commercialId: { not: null } },
+      _sum: { total: true },
+    }),
+    prisma.task.groupBy({
+      by: ['assignedToId'],
+      where: { status: 'COMPLETED', completedAt: { gte: startOfMonth }, assignedToId: { not: null } },
+      _count: { id: true },
+    }),
+    prisma.visit.groupBy({
+      by: ['commercialId'],
+      where: { date: { gte: startOfMonth }, commercialId: { not: null } },
+      _count: { id: true },
+    }),
+  ])
+
+  const salesMap = Object.fromEntries(salesByCommercial.map(s => [s.commercialId!, s._sum.total || 0]))
+  const tasksMap = Object.fromEntries(tasksByCommercial.map(t => [t.assignedToId!, t._count.id]))
+  const visitsMap = Object.fromEntries(visitsByCommercial.map(v => [v.commercialId!, v._count.id]))
 
   const ranked = commercials.map(c => ({
     id: c.id,
     name: c.name,
-    salesTotal: c.sales.reduce((sum, s) => sum + s.total, 0),
-    tasksCompleted: c.tasks.length,
-    visitsCount: c.visits.length,
+    salesTotal: salesMap[c.id] || 0,
+    tasksCompleted: tasksMap[c.id] || 0,
+    visitsCount: visitsMap[c.id] || 0,
   })).sort((a, b) => b.salesTotal - a.salesTotal)
 
   const maxSales = ranked[0]?.salesTotal || 1
