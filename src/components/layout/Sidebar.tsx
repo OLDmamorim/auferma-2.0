@@ -70,25 +70,20 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const content = (
     <aside className="h-full w-64 bg-[#0f1f35] flex flex-col">
       {/* Brand */}
-      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png.png"
-              alt="Auferma"
-              className="w-8 h-8 object-contain"
-              onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
-            />
-          </div>
-          <div>
-            <div className="text-white font-bold text-sm leading-tight tracking-wide">AUFERMA</div>
-            <div className="text-slate-400 text-[10px] tracking-widest uppercase">Commercial Intelligence</div>
-          </div>
+      <div className="border-b border-white/10">
+        {/* Logo fills the header */}
+        <div className="bg-white mx-3 mt-3 mb-3 rounded-xl overflow-hidden flex items-center justify-center px-3 py-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png.png"
+            alt="Auferma"
+            className="w-full max-h-14 object-contain"
+            onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
+          />
         </div>
         {/* Close button — mobile only */}
         {onClose && (
-          <button onClick={onClose} className="md:hidden text-slate-400 hover:text-white p-1">
+          <button onClick={onClose} className="absolute top-3 right-3 md:hidden text-slate-400 hover:text-white p-1">
             <Icon name="x" className="w-5 h-5" />
           </button>
         )}

@@ -34,13 +34,12 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-4 bg-white rounded-2xl px-8 py-5 shadow-2xl">
+          <div className="flex items-center justify-center mb-4 bg-white rounded-2xl px-6 py-4 shadow-2xl w-full">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png.png"
               alt="Auferma"
-              width={220}
-              className="object-contain max-h-24"
+              className="w-full max-h-28 object-contain"
               onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }}
             />
           </div>
