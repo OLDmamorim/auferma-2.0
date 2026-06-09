@@ -175,7 +175,7 @@ function generateAnalysis({ customer, trend, daysWithoutPurchase, daysWithoutVis
   }
 
   // Brands
-  const brands = [...new Set(recentSales.map((s: any) => s.brand?.name).filter(Boolean))]
+  const brands = Array.from(new Set(recentSales.map((s: any) => s.brand?.name).filter(Boolean)))
   if (brands.length > 0) {
     talking_points.push(`Marcas habituais: ${brands.join(', ')}`)
   }
