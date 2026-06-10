@@ -27,8 +27,16 @@ const navItems = [
     items: [
       { href: '/analise-comportamento', label: 'Comportamento', icon: 'signal' },
       { href: '/targets', label: 'Metas', icon: 'target' },
+      { href: '/performance', label: 'Performance', icon: 'trending-up' },
       { href: '/assistente', label: 'Assistente IA', icon: 'sparkles' },
       { href: '/gamificacao', label: 'Gamificação', icon: 'trophy' },
+    ]
+  },
+  {
+    group: 'Diretor',
+    items: [
+      { href: '/supervisao', label: 'Supervisão', icon: 'eye', roles: ['ADMIN', 'DIRECTOR'] },
+      { href: '/alertas', label: 'Alertas', icon: 'bell', roles: ['ADMIN', 'DIRECTOR'] },
     ]
   },
   {
@@ -56,6 +64,9 @@ function Icon({ name, className }: { name: string; className?: string }) {
     'user-circle': 'M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z',
     'funnel': 'M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z',
     'target': 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+    'trending-up': 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+    'eye': 'M15 12a3 3 0 11-6 0 3 3 0 016 0zm-3-9a9.003 9.003 0 00-8.485 6 9.003 9.003 0 0016.97 0A9.003 9.003 0 0012 3z',
+    'bell': 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
     'x': 'M6 18L18 6M6 6l12 12',
   }
   return (
