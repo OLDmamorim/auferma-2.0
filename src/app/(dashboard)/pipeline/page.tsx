@@ -281,7 +281,7 @@ function ProposalModal({ proposal, onClose, onSaved }: { proposal: Proposal | nu
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Estado</label>
-              <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.stage} onChange={e => setForm(f => ({ ...f, stage: e.target.value }))}>
+              <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.stage} onChange={e => setForm(f => ({ ...f, stage: e.target.value as 'SENT' | 'ACCEPTED' | 'LOST' }))}>
                 <option value="SENT">📤 Enviada</option>
                 <option value="ACCEPTED">✅ Aceite</option>
                 <option value="LOST">❌ Perdida</option>
