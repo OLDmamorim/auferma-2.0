@@ -63,7 +63,7 @@ model User {
   createdTasks  Task[]    @relation("CreatedTasks")
   visits        Visit[]
   targets       CommercialTarget[]
-  pipeline      Pipeline[]         @relation("CommercialPipeline")
+  proposals     Proposal[]         @relation("CommercialProposals")
 }
 
 model Brand {
@@ -112,7 +112,7 @@ model Customer {
   visits            Visit[]
   scores            CustomerScore[]
   recommendations   AiRecommendation[]
-  pipeline          Pipeline[]
+  proposals         Proposal[]
 }
 
 model Sale {
@@ -217,25 +217,21 @@ model Import {
   createdAt DateTime @default(now())
 }
 
-enum PipelineStage {
-  PROSPECTING
-  PROPOSAL_SENT
-  NEGOTIATION
+enum ProposalStage {
+  SENT
   ACCEPTED
-  CLOSED_WON
-  CLOSED_LOST
+  LOST
 }
 
-model Pipeline {
+model Proposal {
   id           String        @id @default(cuid())
   customerId   String
   customer     Customer      @relation(fields: [customerId], references: [id])
   commercialId String?
-  commercial   User?         @relation("CommercialPipeline", fields: [commercialId], references: [id])
+  commercial   User?         @relation("CommercialProposals", fields: [commercialId], references: [id])
   title        String
   value        Float
-  stage        PipelineStage @default(PROSPECTING)
-  probability  Int           @default(50)
+  stage        ProposalStage @default(SENT)
   expectedDate DateTime?
   notes        String?
   closedAt     DateTime?
