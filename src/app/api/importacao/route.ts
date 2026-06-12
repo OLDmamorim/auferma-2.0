@@ -8,14 +8,21 @@ export const maxDuration = 26
 
 const DEFAULT_PASSWORD_HASH = bcrypt.hashSync('auferma123', 10)
 
-// Normalise vendedor name → try to match a User in the DB
 function normaliseVendedor(raw: string): string {
   if (!raw) return ''
-  const clean = raw.replace(/^(Administração|Admin|Directas)\s*\/\s*/gi, '').trim()
-  return clean
+  return raw.replace(/^(Administração|Admin|Directas)\s*\/\s*/gi, '').trim()
 }
 
-// Keys are accent-stripped lowercase
+// Derive email: first letter of first name + last surname @auferma.pt
+function vendedorEmail(norm: string): string {
+  const stripped = norm.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const parts = stripped.split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return stripped + '@auferma.pt'
+  const first = parts[0][0] // first initial
+  const last = parts[parts.length - 1] // last surname
+  return `${first}${last}@auferma.pt`
+}
+
 const MONTH_MAP: Record<string, number> = {
   'janeiro': 1, 'fevereiro': 2, 'marco': 3, 'abril': 4,
   'maio': 5, 'junho': 6, 'julho': 7, 'agosto': 8,
@@ -28,7 +35,7 @@ function monthNumber(raw: string | null): number | null {
   return MONTH_MAP[key] || null
 }
 
-const SKIP_BRANDS = ['Descontos', 'Transportes', 'Rendas', 'Imobilizado', 'Diversos']
+const SKIP_BRANDS = new Set(['Descontos', 'Transportes', 'Rendas', 'Imobilizado', 'Diversos'])
 
 interface ImportRow {
   mes: string | null
@@ -62,143 +69,172 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Sem linhas para importar' }, { status: 400 })
   }
 
-  let imported = 0
-  let skipped = 0
-  let errors = 0
-  const errorLog: string[] = []
+  // ── Pre-load all existing data in 3 parallel queries ─────────────────────
+  const [existingUsers, existingBrands, existingCustomers] = await Promise.all([
+    prisma.user.findMany({ select: { id: true, name: true } }),
+    prisma.brand.findMany({ select: { id: true, name: true } }),
+    prisma.customer.findMany({ select: { id: true, nif: true, commercialId: true } }),
+  ])
 
-  // ── Pre-load lookup tables ────────────────────────────────────────────────
-  const existingUsers = await prisma.user.findMany({
-    select: { id: true, name: true },
-  })
   const userMap = new Map<string, string>()
-  for (const u of existingUsers) {
-    userMap.set(u.name.toLowerCase().trim(), u.id)
-  }
+  for (const u of existingUsers) userMap.set(u.name.toLowerCase().trim(), u.id)
 
   const brandCache = new Map<string, string>()
-  const existingBrands = await prisma.brand.findMany({ select: { id: true, name: true } })
   for (const b of existingBrands) brandCache.set(b.name.toLowerCase(), b.id)
 
   const customerCache = new Map<string, { id: string; commercialId: string | null }>()
-  const existingCustomers = await prisma.customer.findMany({ select: { id: true, nif: true, commercialId: true } })
   for (const c of existingCustomers) {
     if (c.nif) customerCache.set(c.nif, { id: c.id, commercialId: c.commercialId })
   }
 
-  // ── Resolve vendedor → user (optionally create) ──────────────────────────
-  async function resolveCommercial(vendedorRaw: string): Promise<string | null> {
-    const norm = normaliseVendedor(vendedorRaw)
-    if (!norm || norm.toLowerCase() === 'inactivo') return null
-    const key = norm.toLowerCase()
-    if (userMap.has(key)) return userMap.get(key)!
+  // ── First pass: collect all unique new brands/vendedores/customers ────────
+  const newBrandNames = new Set<string>()
+  const newVendedorNorms = new Set<string>()
+  const newCustomers = new Map<string, { name: string; address: string | null; zone: string | null; vendedorNorm: string | null }>()
 
-    if (createCommercials) {
-      // Create commercial user with default password (bcrypt hash of 'auferma123')
-      const email = key.replace(/\s+/g, '.').normalize('NFD').replace(/[̀-ͯ]/g, '') + '@auferma.pt'
-      try {
-        const user = await prisma.user.create({
-          data: {
-            name: norm,
-            email,
-            password: DEFAULT_PASSWORD_HASH,
-            role: 'COMMERCIAL',
-            active: true,
-          },
-        })
-        userMap.set(key, user.id)
-        return user.id
-      } catch {
-        return null
-      }
-    }
-    return null
-  }
-
-  // ── Process rows ──────────────────────────────────────────────────────────
-  const salesData: { customerId: string; commercialId: string | null; brandId: string | null; date: Date; total: number }[] = []
   const skipReasons: Record<string, number> = {}
-  const skip = (reason: string) => { skipped++; skipReasons[reason] = (skipReasons[reason] || 0) + 1 }
+  const skip = (reason: string) => { skipReasons[reason] = (skipReasons[reason] || 0) + 1 }
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-    try {
-      if (row.tipo === 'Desconto') { skip('desconto'); continue }
-      const valorLiq = Number(row.valorLiquido) || 0
-      if (valorLiq <= 0) { skip('valor_zero'); continue }
+  // Pre-validated rows to avoid double-parsing in second pass
+  type ValidRow = {
+    lookupNif: string
+    commercialNorm: string | null
+    brandName: string | null
+    date: Date
+    total: number
+    customerName: string
+    address: string | null
+    zone: string | null
+  }
+  const validRows: ValidRow[] = []
 
-      const nif = row.nif ? String(row.nif).trim() : null
-      const numCliente = row.numCliente ? String(row.numCliente).trim() : null
-      if (!nif && !numCliente) { skip('sem_cliente'); continue }
-      if (!row.mes || !row.ano) { skip('sem_data'); continue }
+  for (const row of rows) {
+    if (row.tipo === 'Desconto') { skip('desconto'); continue }
+    const valorLiq = Number(row.valorLiquido) || 0
+    if (valorLiq <= 0) { skip('valor_zero'); continue }
 
-      const mesNum = monthNumber(row.mes)
-      if (!mesNum) { skip('mes_invalido'); continue }
-      const saleDate = new Date(row.ano, mesNum - 1, 15)
+    const nif = row.nif ? String(row.nif).trim() : null
+    const numCliente = row.numCliente ? String(row.numCliente).trim() : null
+    if (!nif && !numCliente) { skip('sem_cliente'); continue }
+    if (!row.mes || !row.ano) { skip('sem_data'); continue }
 
-      // Brand
-      let brandId: string | null = null
-      const class1 = row.class1 ? String(row.class1).trim() : null
-      if (class1 && !SKIP_BRANDS.includes(class1)) {
-        const brandKey = class1.toLowerCase()
-        if (brandCache.has(brandKey)) {
-          brandId = brandCache.get(brandKey)!
-        } else {
-          const brand = await prisma.brand.upsert({
-            where: { name: class1 },
-            create: { name: class1, active: true },
-            update: {},
-          })
-          brandCache.set(brandKey, brand.id)
-          brandId = brand.id
-        }
-      }
+    const mesNum = monthNumber(row.mes)
+    if (!mesNum) { skip('mes_invalido'); continue }
 
-      // Commercial
-      const commercialId = row.vendedor ? await resolveCommercial(String(row.vendedor)) : null
+    const lookupNif = nif || `NUM_${numCliente}`
+    const saleDate = new Date(Number(row.ano), mesNum - 1, 15)
 
-      // Customer
-      const lookupNif = nif || `NUM_${numCliente}`
-      let customerId: string
-      if (customerCache.has(lookupNif)) {
-        customerId = customerCache.get(lookupNif)!.id
-        if (!customerCache.get(lookupNif)!.commercialId && commercialId) {
-          await prisma.customer.update({ where: { id: customerId }, data: { commercialId } })
-          customerCache.set(lookupNif, { id: customerId, commercialId })
-        }
-      } else {
-        const localidade = row.localidade ? String(row.localidade).trim() : null
-        const zone = localidade ? localidade.replace(/^\d{4}-\d{3}\s*/, '').trim() || null : null
-        const customer = await prisma.customer.upsert({
-          where: { nif: lookupNif },
-          create: {
-            name: row.cliente ? String(row.cliente).trim() : `Cliente ${numCliente}`,
-            nif: lookupNif,
-            address: localidade,
-            zone,
-            commercialId,
-            status: 'ACTIVE',
-          },
-          update: {},
+    const class1 = row.class1 ? String(row.class1).trim() : null
+    const brandName = class1 && !SKIP_BRANDS.has(class1) ? class1 : null
+    if (brandName && !brandCache.has(brandName.toLowerCase())) newBrandNames.add(brandName)
+
+    const vendedorRaw = row.vendedor ? String(row.vendedor) : null
+    const vendedorNorm = vendedorRaw ? normaliseVendedor(vendedorRaw) : null
+    const commercialNorm = vendedorNorm && vendedorNorm.toLowerCase() !== 'inactivo' ? vendedorNorm : null
+    if (commercialNorm && createCommercials && !userMap.has(commercialNorm.toLowerCase())) {
+      newVendedorNorms.add(commercialNorm)
+    }
+
+    if (!customerCache.has(lookupNif)) {
+      const localidade = row.localidade ? String(row.localidade).trim() : null
+      const zone = localidade ? localidade.replace(/^\d{4}-\d{3}\s*/, '').trim() || null : null
+      if (!newCustomers.has(lookupNif)) {
+        newCustomers.set(lookupNif, {
+          name: row.cliente ? String(row.cliente).trim() : `Cliente ${numCliente}`,
+          address: localidade,
+          zone,
+          vendedorNorm: commercialNorm,
         })
-        customerId = customer.id
-        customerCache.set(lookupNif, { id: customerId, commercialId })
       }
+    }
 
-      salesData.push({ customerId, commercialId, brandId, date: saleDate, total: valorLiq })
-    } catch (err: any) {
-      errors++
-      if (errorLog.length < 5) errorLog.push(`Linha ${i + 1}: ${err.message}`)
+    validRows.push({ lookupNif, commercialNorm, brandName, date: saleDate, total: valorLiq, customerName: row.cliente ? String(row.cliente).trim() : `Cliente ${numCliente}`, address: row.localidade ? String(row.localidade).trim() : null, zone: null })
+  }
+
+  const skipped = Object.values(skipReasons).reduce((a, b) => a + b, 0)
+
+  // ── Bulk create new brands ────────────────────────────────────────────────
+  if (newBrandNames.size > 0) {
+    const brandArr = Array.from(newBrandNames)
+    await prisma.brand.createMany({
+      data: brandArr.map(name => ({ name, active: true })),
+      skipDuplicates: true,
+    })
+    const created = await prisma.brand.findMany({
+      where: { name: { in: brandArr } },
+      select: { id: true, name: true },
+    })
+    for (const b of created) brandCache.set(b.name.toLowerCase(), b.id)
+  }
+
+  // ── Bulk create new commercials ───────────────────────────────────────────
+  if (createCommercials && newVendedorNorms.size > 0) {
+    const vendArr = Array.from(newVendedorNorms).filter(v => !userMap.has(v.toLowerCase()))
+    if (vendArr.length > 0) {
+      await prisma.user.createMany({
+        data: vendArr.map(norm => ({
+          name: norm,
+          email: vendedorEmail(norm),
+          password: DEFAULT_PASSWORD_HASH,
+          role: 'COMMERCIAL' as const,
+          active: true,
+        })),
+        skipDuplicates: true,
+      })
+      const created = await prisma.user.findMany({
+        where: { name: { in: vendArr } },
+        select: { id: true, name: true },
+      })
+      for (const u of created) userMap.set(u.name.toLowerCase().trim(), u.id)
     }
   }
 
-  // Bulk insert sales
+  // ── Bulk create new customers ─────────────────────────────────────────────
+  if (newCustomers.size > 0) {
+    const custArr = Array.from(newCustomers.entries()).map(([nif, c]) => ({
+      nif,
+      name: c.name,
+      address: c.address,
+      zone: c.zone,
+      commercialId: c.vendedorNorm ? (userMap.get(c.vendedorNorm.toLowerCase()) || null) : null,
+      status: 'ACTIVE' as const,
+    }))
+    await prisma.customer.createMany({ data: custArr, skipDuplicates: true })
+    const created = await prisma.customer.findMany({
+      where: { nif: { in: custArr.map(c => c.nif) } },
+      select: { id: true, nif: true, commercialId: true },
+    })
+    for (const c of created) {
+      if (c.nif) customerCache.set(c.nif, { id: c.id, commercialId: c.commercialId })
+    }
+  }
+
+  // ── Build sales array ─────────────────────────────────────────────────────
+  const salesData: { customerId: string; commercialId: string | null; brandId: string | null; date: Date; total: number }[] = []
+  let errors = 0
+  const errorLog: string[] = []
+
+  for (let i = 0; i < validRows.length; i++) {
+    const r = validRows[i]
+    const cached = customerCache.get(r.lookupNif)
+    if (!cached) {
+      errors++
+      if (errorLog.length < 5) errorLog.push(`NIF não encontrado: ${r.lookupNif}`)
+      continue
+    }
+    const commercialId = r.commercialNorm ? (userMap.get(r.commercialNorm.toLowerCase()) || null) : null
+    const brandId = r.brandName ? (brandCache.get(r.brandName.toLowerCase()) || null) : null
+    salesData.push({ customerId: cached.id, commercialId, brandId, date: r.date, total: r.total })
+  }
+
+  // ── Bulk insert sales ─────────────────────────────────────────────────────
   if (salesData.length > 0) {
     await prisma.sale.createMany({ data: salesData })
-    imported = salesData.length
   }
 
-  // On last chunk: update lastPurchaseDate + log import
+  const imported = salesData.length
+
+  // ── On last chunk: update lastPurchaseDate + log import ───────────────────
   if (isLastChunk) {
     await prisma.$executeRaw`
       UPDATE "Customer" c
