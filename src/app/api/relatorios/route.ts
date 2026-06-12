@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       prisma.sale.aggregate({ where: { commercialId: commercial.id, date: { gte: startOfMonth } }, _sum: { total: true } }),
       prisma.visit.count({ where: { commercialId: commercial.id, date: { gte: weekAgo } } }),
       prisma.visit.count({ where: { commercialId: commercial.id, date: { gte: twoWeeksAgo, lt: weekAgo } } }),
-      prisma.task.count({ where: { status: 'DONE', completedAt: { gte: weekAgo }, customer: { commercialId: commercial.id } } }),
+      prisma.task.count({ where: { status: 'COMPLETED', completedAt: { gte: weekAgo }, customer: { commercialId: commercial.id } } }),
       prisma.task.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] }, customer: { commercialId: commercial.id } } }),
       prisma.customer.count({ where: { commercialId: commercial.id, status: 'ACTIVE', OR: [{ lastPurchaseDate: { lt: new Date(now.getTime() - 30 * 86400000) } }, { riskScore: { gt: 60 } }] } }),
       prisma.commercialTarget.findUnique({ where: { userId_year_month: { userId: commercial.id, year: now.getFullYear(), month: now.getMonth() + 1 } } }),
