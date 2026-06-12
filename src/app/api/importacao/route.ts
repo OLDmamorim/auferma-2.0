@@ -15,10 +15,17 @@ function normaliseVendedor(raw: string): string {
   return clean
 }
 
+// Keys are accent-stripped lowercase
 const MONTH_MAP: Record<string, number> = {
-  'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
-  'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
-  'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12,
+  'janeiro': 1, 'fevereiro': 2, 'marco': 3, 'abril': 4,
+  'maio': 5, 'junho': 6, 'julho': 7, 'agosto': 8,
+  'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12,
+}
+
+function monthNumber(raw: string | null): number | null {
+  if (!raw) return null
+  const key = String(raw).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+  return MONTH_MAP[key] || null
 }
 
 const SKIP_BRANDS = ['Descontos', 'Transportes', 'Rendas', 'Imobilizado', 'Diversos']
@@ -110,21 +117,23 @@ export async function POST(req: NextRequest) {
 
   // ── Process rows ──────────────────────────────────────────────────────────
   const salesData: { customerId: string; commercialId: string | null; brandId: string | null; date: Date; total: number }[] = []
+  const skipReasons: Record<string, number> = {}
+  const skip = (reason: string) => { skipped++; skipReasons[reason] = (skipReasons[reason] || 0) + 1 }
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     try {
-      if (row.tipo === 'Desconto') { skipped++; continue }
+      if (row.tipo === 'Desconto') { skip('desconto'); continue }
       const valorLiq = Number(row.valorLiquido) || 0
-      if (valorLiq <= 0) { skipped++; continue }
+      if (valorLiq <= 0) { skip('valor_zero'); continue }
 
       const nif = row.nif ? String(row.nif).trim() : null
       const numCliente = row.numCliente ? String(row.numCliente).trim() : null
-      if (!nif && !numCliente) { skipped++; continue }
-      if (!row.mes || !row.ano) { skipped++; continue }
+      if (!nif && !numCliente) { skip('sem_cliente'); continue }
+      if (!row.mes || !row.ano) { skip('sem_data'); continue }
 
-      const mesNum = MONTH_MAP[row.mes]
-      if (!mesNum) { skipped++; continue }
+      const mesNum = monthNumber(row.mes)
+      if (!mesNum) { skip('mes_invalido'); continue }
       const saleDate = new Date(row.ano, mesNum - 1, 15)
 
       // Brand
@@ -206,7 +215,7 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  return NextResponse.json({ imported, skipped, errors, errorLog })
+  return NextResponse.json({ imported, skipped, errors, errorLog, skipReasons })
 }
 
 export async function GET(req: NextRequest) {

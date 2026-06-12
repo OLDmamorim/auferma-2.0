@@ -16,6 +16,7 @@ interface Totals {
   skipped: number
   errors: number
   errorLog: string[]
+  skipReasons: Record<string, number>
 }
 
 const CHUNK_SIZE = 1000
@@ -102,22 +103,52 @@ export default function ImportacaoAufermaPage() {
 
       setPhase(`${rawRows.length.toLocaleString()} linhas lidas. A preparar dados...`)
 
-      // ── 2. Map to compact payload ──────────────────────────────────────
+      if (rawRows.length === 0) throw new Error('O ficheiro não tem linhas de dados.')
+
+      // ── 2. Resolve real header names (robust to accents/spacing) ──────
+      const normalize = (s: string) =>
+        s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+
+      const actualKeys = Object.keys(rawRows[0])
+      const keyMap = new Map<string, string>()
+      for (const k of actualKeys) keyMap.set(normalize(k), k)
+
+      const col = (wanted: string): string | null => keyMap.get(normalize(wanted)) || null
+
+      const K = {
+        mes: col('Mês'),
+        ano: col('Ficheiro'),
+        numCliente: col('Numero Cliente'),
+        nif: col('NIF'),
+        vendedor: col('Vendedor'),
+        cliente: col('Cliente'),
+        localidade: col('Localidade'),
+        class1: col('Classificação 1'),
+        valorLiquido: col('Valor Líquido'),
+        tipo: col('Tipo'),
+      }
+
+      const missing = Object.entries(K).filter(([, v]) => !v).map(([k]) => k)
+      if (missing.length > 0) {
+        throw new Error(`Colunas não encontradas: ${missing.join(', ')}. Colunas no ficheiro: ${actualKeys.join(' | ')}`)
+      }
+
+      // ── 3. Map to compact payload ──────────────────────────────────────
       const rows = rawRows.map(r => ({
-        mes: r['Mês'] ?? null,
-        ano: r['Ficheiro'] ? parseInt(String(r['Ficheiro'])) : null,
-        numCliente: r['Numero Cliente'] ?? null,
-        nif: r['NIF'] ?? null,
-        vendedor: r['Vendedor'] ?? null,
-        cliente: r['Cliente'] ?? null,
-        localidade: r['Localidade'] ?? null,
-        class1: r['Classificação 1'] ?? null,
-        valorLiquido: parseFloat(r['Valor Líquido'] ?? r['Valor Liquido'] ?? 0) || 0,
-        tipo: r['Tipo'] ?? null,
+        mes: r[K.mes!] != null ? String(r[K.mes!]).trim() : null,
+        ano: r[K.ano!] ? parseInt(String(r[K.ano!])) : null,
+        numCliente: r[K.numCliente!] ?? null,
+        nif: r[K.nif!] ?? null,
+        vendedor: r[K.vendedor!] ?? null,
+        cliente: r[K.cliente!] ?? null,
+        localidade: r[K.localidade!] ?? null,
+        class1: r[K.class1!] ?? null,
+        valorLiquido: parseFloat(String(r[K.valorLiquido!] ?? 0)) || 0,
+        tipo: r[K.tipo!] ?? null,
       }))
 
       // ── 3. Send in chunks ──────────────────────────────────────────────
-      const totals: Totals = { imported: 0, skipped: 0, errors: 0, errorLog: [] }
+      const totals: Totals = { imported: 0, skipped: 0, errors: 0, errorLog: [], skipReasons: {} }
       const numChunks = Math.ceil(rows.length / CHUNK_SIZE)
       setProgress({ done: 0, total: numChunks })
 
@@ -144,6 +175,11 @@ export default function ImportacaoAufermaPage() {
             totals.skipped += data.skipped || 0
             totals.errors += data.errors || 0
             if (data.errorLog?.length) totals.errorLog.push(...data.errorLog.slice(0, 3))
+            if (data.skipReasons) {
+              for (const [reason, count] of Object.entries(data.skipReasons)) {
+                totals.skipReasons[reason] = (totals.skipReasons[reason] || 0) + (count as number)
+              }
+            }
             ok = true
           } catch (err: any) {
             attempt++
@@ -347,6 +383,18 @@ export default function ImportacaoAufermaPage() {
                 <p className="text-xs text-gray-500">Erros</p>
               </div>
             </div>
+            {Object.keys(result.skipReasons || {}).length > 0 && (
+              <div className="mt-3 bg-white rounded-lg p-3">
+                <p className="text-xs font-medium text-gray-600 mb-1.5">Motivos de exclusão:</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(result.skipReasons).map(([reason, count]) => (
+                    <span key={reason} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                      {reason}: {count.toLocaleString()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {result.errorLog.length > 0 && (
