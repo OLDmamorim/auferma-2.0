@@ -28,6 +28,8 @@ export default function ImportacaoAufermaPage() {
   const [result, setResult] = useState<ImportResult | null>(null)
   const [stats, setStats] = useState<DbStats | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [resetting, setResetting] = useState(false)
+  const [resetDone, setResetDone] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fetchStats = useCallback(() => {
@@ -58,6 +60,26 @@ export default function ImportacaoAufermaPage() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (f) { setFile(f); setResult(null); setError(null) }
+  }
+
+  async function handleReset() {
+    if (!confirm('Isto vai apagar TODOS os clientes, vendas, marcas, tarefas e visitas.\n\nOs utilizadores (logins) são mantidos.\n\nTem a certeza?')) return
+    if (!confirm('Segunda confirmação: apagar todos os dados fictícios?')) return
+    setResetting(true)
+    try {
+      const res = await fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'RESET_CONFIRMED' }),
+      })
+      const data = await res.json()
+      if (res.ok) { setResetDone(true); fetchStats() }
+      else setError(data.error || 'Erro no reset')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setResetting(false)
+    }
   }
 
   async function startImport() {
@@ -118,6 +140,32 @@ export default function ImportacaoAufermaPage() {
             <p className="text-xl font-bold text-gray-900">{stats.commercials}</p>
             <p className="text-xs text-gray-500 mt-0.5">Comerciais</p>
           </div>
+        </div>
+      )}
+
+      {/* Reset section */}
+      {stats && (stats.customers > 0 || stats.sales > 0) && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-red-900">Limpar dados de demonstração</p>
+              <p className="text-xs text-red-700 mt-1">
+                A BD tem {stats.customers.toLocaleString()} clientes e {stats.sales.toLocaleString()} vendas.
+                Se forem dados fictícios do seed, limpe antes de importar os dados reais.
+                Os utilizadores e logins são mantidos.
+              </p>
+            </div>
+            <button
+              onClick={handleReset}
+              disabled={resetting}
+              className="flex-shrink-0 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-60 whitespace-nowrap"
+            >
+              {resetting ? 'A limpar...' : '🗑️ Limpar BD'}
+            </button>
+          </div>
+          {resetDone && (
+            <p className="text-xs text-green-700 font-medium mt-2">✓ Base de dados limpa com sucesso. Pronto para importar.</p>
+          )}
         </div>
       )}
 
