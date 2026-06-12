@@ -42,7 +42,8 @@ const navItems = [
   {
     group: 'Sistema',
     items: [
-      { href: '/importacao', label: 'Importação', icon: 'upload', roles: ['ADMIN', 'DIRECTOR'] },
+      { href: '/importacao-auferma', label: 'Importar Matriz', icon: 'upload', roles: ['ADMIN', 'DIRECTOR'] },
+      { href: '/importacao', label: 'Importação CSV', icon: 'upload', roles: ['ADMIN', 'DIRECTOR'] },
       { href: '/configuracoes', label: 'Configurações', icon: 'cog', roles: ['ADMIN'] },
     ]
   }
