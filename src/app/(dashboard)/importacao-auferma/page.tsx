@@ -269,7 +269,7 @@ export default function ImportacaoAufermaPage() {
           <div>
             <p className="text-sm font-medium text-gray-900">Criar comerciais automaticamente</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Cria um utilizador para cada vendedor do Excel que não exista (ex: António Antunes → antonio.antunes@auferma.pt, password inicial: auferma123)
+              Cria um utilizador para cada vendedor do Excel que não exista (ex: António Antunes → aantunes@auferma.pt, password inicial: auferma123)
             </p>
           </div>
         </label>
