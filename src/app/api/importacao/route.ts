@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
         // Fuzzy: try partial match on first word
         if (!commercialId) {
           const firstName = vendedorNorm.split(' ')[0]
-          for (const [key, id] of userMap.entries()) {
+          for (const [key, id] of Array.from(userMap.entries())) {
             if (key.startsWith(firstName) && firstName.length > 3) {
               commercialId = id
               break
