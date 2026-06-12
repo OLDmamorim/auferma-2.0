@@ -35,6 +35,7 @@ const navItems = [
   {
     group: 'Diretor',
     items: [
+      { href: '/radiografia', label: 'Radiografia', icon: 'scan', roles: ['ADMIN', 'DIRECTOR'] },
       { href: '/supervisao', label: 'Supervisão', icon: 'eye', roles: ['ADMIN', 'DIRECTOR'] },
       { href: '/alertas', label: 'Alertas', icon: 'bell', roles: ['ADMIN', 'DIRECTOR'] },
     ]
@@ -68,6 +69,7 @@ function Icon({ name, className }: { name: string; className?: string }) {
     'trending-up': 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
     'eye': 'M15 12a3 3 0 11-6 0 3 3 0 016 0zm-3-9a9.003 9.003 0 00-8.485 6 9.003 9.003 0 0016.97 0A9.003 9.003 0 0012 3z',
     'bell': 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+    'scan': 'M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18',
     'x': 'M6 18L18 6M6 6l12 12',
   }
   return (
