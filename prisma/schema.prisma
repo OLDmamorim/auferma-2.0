@@ -174,14 +174,15 @@ model Visit {
 }
 
 model CommercialTarget {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  year      Int
-  month     Int
-  target    Float
-  achieved  Float    @default(0)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  year       Int
+  month      Int
+  growthPct  Float    @default(0)
+  target     Float    @default(0)
+  achieved   Float    @default(0)
+  createdAt  DateTime @default(now())
 
   @@unique([userId, year, month])
 }
