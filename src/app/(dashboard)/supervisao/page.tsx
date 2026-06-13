@@ -172,7 +172,7 @@ export default function SupervisaoPage() {
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-gray-500">Meta mensal</span>
                     <span className={`font-medium ${c.targetPct === null ? 'text-gray-400' : c.targetPct >= 80 ? 'text-green-600' : c.targetPct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
-                      {c.targetPct !== null ? `${c.targetPct}%` : 'Não definida'}
+                      {c.targetPct !== null ? `${Math.round(c.targetPct)}%` : 'Não definida'}
                     </span>
                   </div>
                   <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -187,7 +187,7 @@ export default function SupervisaoPage() {
                 {c.lastActivityDate && (
                   <p className="text-xs text-gray-400 mt-1">
                     {(() => {
-                      const days = Math.floor((Date.now() - new Date(c.lastActivityDate!).getTime()) / 86400000)
+                      const days = Math.max(0, Math.floor((Date.now() - new Date(c.lastActivityDate!).getTime()) / 86400000))
                       return `Última atividade: ${days === 0 ? 'hoje' : `há ${days} dia${days !== 1 ? 's' : ''}`}`
                     })()}
                   </p>
@@ -239,12 +239,12 @@ export default function SupervisaoPage() {
                       </td>
                       <td>
                         {c.targetPct !== null
-                          ? <span className={`text-sm font-medium ${c.targetPct >= 80 ? 'text-green-600' : c.targetPct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{c.targetPct}%</span>
+                          ? <span className={`text-sm font-medium ${c.targetPct >= 80 ? 'text-green-600' : c.targetPct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{Math.round(c.targetPct)}%</span>
                           : <span className="text-xs text-gray-400">—</span>
                         }
                       </td>
                       <td className="text-xs text-gray-500">
-                        {!c.lastActivityDate ? '—' : (() => { const d = Math.floor((Date.now() - new Date(c.lastActivityDate).getTime()) / 86400000); return d === 0 ? 'Hoje' : `${d}d` })()}
+                        {!c.lastActivityDate ? '—' : (() => { const d = Math.max(0, Math.floor((Date.now() - new Date(c.lastActivityDate).getTime()) / 86400000)); return d === 0 ? 'Hoje' : `${d}d` })()}
                       </td>
                     </tr>
                   )
