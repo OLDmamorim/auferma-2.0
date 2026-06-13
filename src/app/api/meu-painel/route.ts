@@ -58,7 +58,6 @@ export async function GET(req: NextRequest) {
           id: true, date: true, total: true,
           customer: { select: { name: true } },
           brand: { select: { name: true } },
-          commercial: { select: { name: true } },
         },
         orderBy: { date: 'desc' },
         take: 5,
