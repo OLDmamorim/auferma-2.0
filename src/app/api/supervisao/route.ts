@@ -250,7 +250,8 @@ export async function GET() {
       status = 'inactive'
     }
 
-    const targetPct = target && target.target > 0 ? (target.achieved / target.target) * 100 : null
+    const salesThisMonth = salesMonthMap.get(id) ?? 0
+    const targetPct = target && target.target > 0 ? (salesThisMonth / target.target) * 100 : null
 
     // Alerts for this commercial
     if (lastVisitDate && lastVisitDate < tenDaysAgo) {
@@ -316,7 +317,7 @@ export async function GET() {
       visitsToday: visitsTodayMap.get(id) ?? 0,
       tasksDoneThisWeek: tasksDoneMap.get(id) ?? 0,
       tasksPending: tasksPendingMap.get(id) ?? 0,
-      monthTarget: target ? { target: target.target, achieved: target.achieved } : null,
+      monthTarget: target ? { target: target.target, achieved: salesThisMonth } : null,
       targetPct,
       customersTotal: customersTotalMap.get(id) ?? 0,
       customersAtRisk: customersAtRiskMap.get(id) ?? 0,
