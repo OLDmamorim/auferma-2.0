@@ -6,7 +6,8 @@ import PageHeader from '@/components/layout/PageHeader'
 export default function ConfiguracoesPage() {
   const { data: session } = useSession()
   const role = (session?.user as any)?.role
-  const [saved, setSaved] = useState(false)
+  const [cleanupState, setCleanupState] = useState<'idle' | 'confirm' | 'loading' | 'done'>('idle')
+  const [cleanupResult, setCleanupResult] = useState<{ deleted: number; removedUsers: string[] } | null>(null)
 
   if (role !== 'ADMIN') {
     return (
@@ -14,6 +15,14 @@ export default function ConfiguracoesPage() {
         <p className="text-gray-500">Acesso restrito a Administradores.</p>
       </div>
     )
+  }
+
+  async function runCleanup() {
+    setCleanupState('loading')
+    const res = await fetch('/api/cleanup-demo-users', { method: 'POST' })
+    const data = await res.json()
+    setCleanupResult(data)
+    setCleanupState('done')
   }
 
   return (
@@ -91,6 +100,65 @@ export default function ConfiguracoesPage() {
               </svg>
             </a>
           </div>
+        </div>
+
+        {/* Cleanup demo users */}
+        <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Remover utilizadores de demonstração</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Remove todos os comerciais que não têm nenhuma venda associada na base de dados.
+            Use após importar os dados reais para limpar os utilizadores de seed.
+          </p>
+
+          {cleanupState === 'done' && cleanupResult ? (
+            <div className={`rounded-lg p-3 text-sm ${cleanupResult.deleted > 0 ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-600'}`}>
+              {cleanupResult.deleted > 0 ? (
+                <>
+                  <p className="font-semibold mb-1">✓ {cleanupResult.deleted} utilizador(es) removidos</p>
+                  <p className="text-xs">{cleanupResult.removedUsers.join(', ')}</p>
+                </>
+              ) : (
+                <p>Nenhum utilizador demo encontrado — todos têm vendas associadas.</p>
+              )}
+            </div>
+          ) : cleanupState === 'confirm' ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800 mb-3">
+                Tem a certeza? Esta ação remove permanentemente todos os comerciais sem vendas.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={runCleanup}
+                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition"
+                >
+                  Confirmar remoção
+                </button>
+                <button
+                  onClick={() => setCleanupState('idle')}
+                  className="bg-white border border-gray-200 text-gray-600 text-xs font-medium px-3 py-2 rounded-lg transition"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setCleanupState('confirm')}
+              disabled={cleanupState === 'loading'}
+              className="flex items-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-50"
+            >
+              {cleanupState === 'loading' ? (
+                <><span className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />A remover...</>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Remover utilizadores demo
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Seed info */}
