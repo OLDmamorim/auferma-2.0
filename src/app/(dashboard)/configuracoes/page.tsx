@@ -138,6 +138,83 @@ export default function ConfiguracoesPage() {
     <div className="p-4 md:p-6 max-w-3xl space-y-4">
       <PageHeader title="Configurações" subtitle="Definições gerais do sistema" />
 
+      {/* ── User Form Modal ── */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowForm(false)} />
+          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-xl shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-900">
+                {editUser ? `Editar: ${editUser.name}` : 'Criar novo utilizador'}
+              </h2>
+              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block">Nome completo</label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: António Antunes"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block">Email</label>
+                <input
+                  type="email"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="aantunes@auferma.pt"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block">
+                  Palavra-passe {editUser && <span className="text-gray-400">(deixar vazio para manter)</span>}
+                </label>
+                <input
+                  type="password"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder={editUser ? '••••••••' : 'Mínimo 6 caracteres'}
+                  value={form.password}
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block">Perfil</label>
+                <select
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={form.role}
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                >
+                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+            </div>
+            {formError && <p className="text-xs text-red-600">{formError}</p>}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={submitForm}
+                disabled={saving}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-3 rounded-xl transition"
+              >
+                {saving ? 'A guardar...' : editUser ? 'Guardar alterações' : 'Criar utilizador'}
+              </button>
+              <button
+                onClick={() => setShowForm(false)}
+                className="bg-white border border-gray-200 text-gray-600 text-sm px-4 py-3 rounded-xl transition hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── User Management ── */}
       <div className="bg-white border border-gray-100 shadow-sm rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -156,74 +233,6 @@ export default function ConfiguracoesPage() {
           </button>
         </div>
 
-        {/* Create / Edit form */}
-        {showForm && (
-          <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
-            <p className="text-sm font-semibold text-blue-800 mb-3">
-              {editUser ? `Editar: ${editUser.name}` : 'Criar novo utilizador'}
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-600 mb-1 block">Nome completo</label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: António Antunes"
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600 mb-1 block">Email</label>
-                <input
-                  type="email"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="aantunes@auferma.pt"
-                  value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600 mb-1 block">
-                  Palavra-passe {editUser && <span className="text-gray-400">(deixar vazio para manter)</span>}
-                </label>
-                <input
-                  type="password"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={editUser ? '••••••••' : 'Mínimo 6 caracteres'}
-                  value={form.password}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600 mb-1 block">Perfil</label>
-                <select
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                >
-                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-              </div>
-            </div>
-            {formError && <p className="text-xs text-red-600 mt-2">{formError}</p>}
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={submitForm}
-                disabled={saving}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-              >
-                {saving ? 'A guardar...' : editUser ? 'Guardar alterações' : 'Criar utilizador'}
-              </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="bg-white border border-gray-200 text-gray-600 text-sm px-4 py-2 rounded-lg transition hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* User list */}
         {loadingUsers ? (
