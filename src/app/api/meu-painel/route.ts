@@ -9,13 +9,7 @@ export async function GET(req: NextRequest) {
 
   const userId = (session.user as any).id as string
   const role = (session.user as any).role as string
-
-  // Determine which commercial to filter by
-  let commercialId = userId
-  if (role === 'ADMIN' || role === 'DIRECTOR') {
-    const qp = req.nextUrl.searchParams.get('commercialId')
-    if (qp) commercialId = qp
-  }
+  const isDirector = role === 'ADMIN' || role === 'DIRECTOR'
 
   const now = new Date()
   const year = now.getFullYear()
@@ -24,9 +18,7 @@ export async function GET(req: NextRequest) {
   const startOfLastMonth = new Date(year, month - 1, 1)
   const endOfLastMonth = new Date(year, month, 0, 23, 59, 59, 999)
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-
-  // Monday of current week
-  const dayOfWeek = now.getDay() // 0=Sunday
+  const dayOfWeek = now.getDay()
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
   const startOfWeek = new Date(now)
   startOfWeek.setDate(now.getDate() - daysSinceMonday)
@@ -34,6 +26,67 @@ export async function GET(req: NextRequest) {
   const endOfWeek = new Date(startOfWeek)
   endOfWeek.setDate(startOfWeek.getDate() + 6)
   endOfWeek.setHours(23, 59, 59, 999)
+
+  // ── DIRECTOR / ADMIN: team totals ────────────────────────────────────────
+  if (isDirector) {
+    const [
+      salesThisMonthAgg,
+      salesLastMonthAgg,
+      allTargets,
+      totalCustomers,
+      atRiskCustomers,
+      visitsThisWeekCount,
+      pendingTasksCount,
+      recentSales,
+      commercialsCount,
+    ] = await Promise.all([
+      prisma.sale.aggregate({ where: { date: { gte: startOfMonth } }, _sum: { total: true } }),
+      prisma.sale.aggregate({ where: { date: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { total: true } }),
+      prisma.commercialTarget.findMany({ where: { year, month: month + 1 }, select: { target: true } }),
+      prisma.customer.count({ where: { status: 'ACTIVE' } }),
+      prisma.customer.findMany({
+        where: { OR: [{ lastPurchaseDate: { lt: thirtyDaysAgo } }, { riskScore: { gt: 60 } }] },
+        select: { id: true, name: true, lastPurchaseDate: true, riskScore: true, commercial: { select: { name: true } } },
+        orderBy: { riskScore: 'desc' },
+        take: 5,
+      }),
+      prisma.visit.count({ where: { date: { gte: startOfWeek, lte: endOfWeek } } }),
+      prisma.task.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] } } }),
+      prisma.sale.findMany({
+        where: { date: { gte: startOfMonth } },
+        select: {
+          id: true, date: true, total: true,
+          customer: { select: { name: true } },
+          brand: { select: { name: true } },
+          commercial: { select: { name: true } },
+        },
+        orderBy: { date: 'desc' },
+        take: 5,
+      }),
+      prisma.user.count({ where: { role: 'COMMERCIAL', active: true } }),
+    ])
+
+    const teamTarget = allTargets.reduce((s, t) => s + (t.target || 0), 0)
+    const salesThisMonth = salesThisMonthAgg._sum.total ?? 0
+    const targetPct = teamTarget > 0 ? (salesThisMonth / teamTarget) * 100 : null
+
+    return NextResponse.json({
+      isTeam: true,
+      salesThisMonth,
+      salesLastMonth: salesLastMonthAgg._sum.total ?? 0,
+      monthTarget: teamTarget > 0 ? { target: teamTarget, achieved: salesThisMonth, pct: targetPct } : null,
+      myCustomers: totalCustomers,
+      atRiskCustomers,
+      pendingTasks: [],
+      pendingTasksCount,
+      visitsThisWeek: { count: visitsThisWeekCount, items: [] },
+      recentSales,
+      commercialsCount,
+    })
+  }
+
+  // ── COMMERCIAL: personal data ─────────────────────────────────────────────
+  const commercialId = userId
 
   const [
     salesThisMonthAgg,
@@ -45,74 +98,37 @@ export async function GET(req: NextRequest) {
     visitsThisWeekRaw,
     recentSales,
   ] = await Promise.all([
-    // Sales this month
-    prisma.sale.aggregate({
-      where: { commercialId, date: { gte: startOfMonth } },
-      _sum: { total: true },
-    }),
-    // Sales last month
-    prisma.sale.aggregate({
-      where: { commercialId, date: { gte: startOfLastMonth, lte: endOfLastMonth } },
-      _sum: { total: true },
-    }),
-    // CommercialTarget for current month
+    prisma.sale.aggregate({ where: { commercialId, date: { gte: startOfMonth } }, _sum: { total: true } }),
+    prisma.sale.aggregate({ where: { commercialId, date: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { total: true } }),
     prisma.commercialTarget.findUnique({
       where: { userId_year_month: { userId: commercialId, year, month: month + 1 } },
-      select: { target: true, achieved: true },
+      select: { target: true },
     }),
-    // Count of customers
     prisma.customer.count({ where: { commercialId } }),
-    // At-risk customers
     prisma.customer.findMany({
-      where: {
-        commercialId,
-        OR: [
-          { lastPurchaseDate: { lt: thirtyDaysAgo } },
-          { riskScore: { gt: 60 } },
-        ],
-      },
+      where: { commercialId, OR: [{ lastPurchaseDate: { lt: thirtyDaysAgo } }, { riskScore: { gt: 60 } }] },
       select: { id: true, name: true, lastPurchaseDate: true, riskScore: true },
       take: 5,
       orderBy: { riskScore: 'desc' },
     }),
-    // Pending tasks
     prisma.task.findMany({
-      where: {
-        assignedToId: commercialId,
-        status: { in: ['PENDING', 'IN_PROGRESS'] },
-      },
+      where: { assignedToId: commercialId, status: { in: ['PENDING', 'IN_PROGRESS'] } },
       select: {
-        id: true,
-        title: true,
-        priority: true,
-        dueDate: true,
-        status: true,
+        id: true, title: true, priority: true, dueDate: true, status: true,
         customer: { select: { id: true, name: true } },
       },
       orderBy: [{ priority: 'desc' }, { dueDate: 'asc' }],
       take: 5,
     }),
-    // Visits this week
     prisma.visit.findMany({
-      where: {
-        commercialId,
-        date: { gte: startOfWeek, lte: endOfWeek },
-      },
-      select: {
-        id: true,
-        date: true,
-        type: true,
-        customer: { select: { id: true, name: true } },
-      },
+      where: { commercialId, date: { gte: startOfWeek, lte: endOfWeek } },
+      select: { id: true, date: true, type: true, customer: { select: { id: true, name: true } } },
       orderBy: { date: 'asc' },
     }),
-    // Recent sales
     prisma.sale.findMany({
       where: { commercialId },
       select: {
-        id: true,
-        date: true,
-        total: true,
+        id: true, date: true, total: true,
         customer: { select: { name: true } },
         brand: { select: { name: true } },
       },
@@ -121,17 +137,19 @@ export async function GET(req: NextRequest) {
     }),
   ])
 
+  const salesThisMonth = salesThisMonthAgg._sum.total ?? 0
+  const target = monthTarget?.target ?? 0
+  const targetPct = target > 0 ? (salesThisMonth / target) * 100 : null
+
   return NextResponse.json({
-    salesThisMonth: salesThisMonthAgg._sum.total ?? 0,
+    isTeam: false,
+    salesThisMonth,
     salesLastMonth: salesLastMonthAgg._sum.total ?? 0,
-    monthTarget: monthTarget ?? null,
+    monthTarget: target > 0 ? { target, achieved: salesThisMonth, pct: targetPct } : null,
     myCustomers: myCustomersCount,
     atRiskCustomers,
     pendingTasks,
-    visitsThisWeek: {
-      count: visitsThisWeekRaw.length,
-      items: visitsThisWeekRaw,
-    },
+    visitsThisWeek: { count: visitsThisWeekRaw.length, items: visitsThisWeekRaw },
     recentSales,
   })
 }

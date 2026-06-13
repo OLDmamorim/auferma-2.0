@@ -45,14 +45,17 @@ interface RecentSale {
 }
 
 interface PainelData {
+  isTeam: boolean
   salesThisMonth: number
   salesLastMonth: number
   monthTarget: MonthTarget | null
   myCustomers: number
   atRiskCustomers: AtRiskCustomer[]
   pendingTasks: PendingTask[]
+  pendingTasksCount?: number
   visitsThisWeek: { count: number; items: Visit[] }
   recentSales: RecentSale[]
+  commercialsCount?: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -215,23 +218,36 @@ export default function MeuPainelPage() {
       .catch(() => setLoading(false))
   }, [])
 
-  const userName = session?.user?.name?.split(' ')[0] || 'Comercial'
+  const userName = session?.user?.name?.split(' ')[0] || 'Utilizador'
+  const role = (session?.user as any)?.role
+  const isDirector = role === 'ADMIN' || role === 'DIRECTOR'
+  const isTeam = data?.isTeam ?? false
 
   return (
     <div className="p-6">
       <PageHeader
-        title={`O Meu Painel`}
-        subtitle={`Bem-vindo, ${userName} — resumo da sua actividade comercial`}
+        title={isTeam ? 'Painel da Equipa' : 'O Meu Painel'}
+        subtitle={
+          isTeam
+            ? `Bem-vindo, ${userName} — totais consolidados de ${data?.commercialsCount ?? '—'} comerciais`
+            : `Bem-vindo, ${userName} — resumo da sua actividade comercial`
+        }
         actions={
-          <Link
-            href="/visitas"
-            className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Registar Visita
-          </Link>
+          !isTeam ? (
+            <Link
+              href="/visitas"
+              className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Registar Visita
+            </Link>
+          ) : (
+            <Link href="/supervisao" className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition">
+              Ver Supervisão →
+            </Link>
+          )
         }
       />
 
@@ -253,7 +269,7 @@ export default function MeuPainelPage() {
         ) : (
           <>
             <KpiCard
-              title="Clientes na carteira"
+              title={isTeam ? 'Clientes ativos' : 'Clientes na carteira'}
               value={data?.myCustomers ?? 0}
               color="blue"
               icon={
@@ -274,7 +290,7 @@ export default function MeuPainelPage() {
             />
             <KpiCard
               title="Tarefas pendentes"
-              value={data?.pendingTasks.length ?? 0}
+              value={isTeam ? (data?.pendingTasksCount ?? 0) : (data?.pendingTasks.length ?? 0)}
               color="orange"
               icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
