@@ -18,10 +18,9 @@ interface CommercialData {
   tasksPending: number
   customersTotal: number
   customersAtRisk: number
-  target: number
+  monthTarget: { target: number; achieved: number } | null
   targetPct: number | null
   lastActivityDate: string | null
-  daysSinceActivity: number | null
   status: 'active' | 'warning' | 'inactive'
 }
 
@@ -187,7 +186,10 @@ export default function SupervisaoPage() {
 
                 {c.lastActivityDate && (
                   <p className="text-xs text-gray-400 mt-1">
-                    Última atividade: {c.daysSinceActivity === 0 ? 'hoje' : `há ${c.daysSinceActivity} dias`}
+                    {(() => {
+                      const days = Math.floor((Date.now() - new Date(c.lastActivityDate!).getTime()) / 86400000)
+                      return `Última atividade: ${days === 0 ? 'hoje' : `há ${days} dia${days !== 1 ? 's' : ''}`}`
+                    })()}
                   </p>
                 )}
               </div>
@@ -242,7 +244,7 @@ export default function SupervisaoPage() {
                         }
                       </td>
                       <td className="text-xs text-gray-500">
-                        {c.daysSinceActivity === null ? '—' : c.daysSinceActivity === 0 ? 'Hoje' : `${c.daysSinceActivity}d`}
+                        {!c.lastActivityDate ? '—' : (() => { const d = Math.floor((Date.now() - new Date(c.lastActivityDate).getTime()) / 86400000); return d === 0 ? 'Hoje' : `${d}d` })()}
                       </td>
                     </tr>
                   )
