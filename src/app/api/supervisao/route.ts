@@ -338,15 +338,22 @@ export async function GET() {
   const sumAchieved = targetsWithData.reduce((s, c) => s + (c.monthTarget?.achieved ?? 0), 0)
   const teamTargetPct = sumTarget > 0 ? (sumAchieved / sumTarget) * 100 : null
 
+  const activeCount = commercialsData.filter(c => c.status === 'active').length
+  const warningCount = commercialsData.filter(c => c.status === 'warning').length
+  const inactiveCount = commercialsData.filter(c => c.status === 'inactive').length
+
   return NextResponse.json({
     commercials: commercialsData,
-    teamSummary: {
-      totalSalesThisMonth,
-      totalSalesThisWeek,
-      totalVisitsThisWeek,
-      totalTasksDone,
-      totalCustomersAtRisk,
+    team: {
+      salesThisMonth: totalSalesThisMonth,
+      salesThisWeek: totalSalesThisWeek,
+      visitsThisWeek: totalVisitsThisWeek,
+      tasksDone: totalTasksDone,
+      customersAtRisk: totalCustomersAtRisk,
       teamTargetPct,
+      active: activeCount,
+      warning: warningCount,
+      inactive: inactiveCount,
     },
     alerts: alerts.slice(0, 20),
   })
