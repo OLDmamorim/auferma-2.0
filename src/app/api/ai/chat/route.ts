@@ -138,25 +138,55 @@ async function buildContext(userId: string, role: string): Promise<string> {
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const filter = role === 'COMMERCIAL' ? { commercialId: userId } : {}
   const taskFilter = role === 'COMMERCIAL' ? { assignedToId: userId } : {}
 
+  // Monthly sales history (all available months, grouped)
+  type MonthRow = { month: Date; total: number }
+  type CommRow = { commercial: string; month: Date; total: number }
+
+  const monthlyHistoryPromise: Promise<MonthRow[]> = role === 'COMMERCIAL'
+    ? prisma.$queryRaw`
+        SELECT DATE_TRUNC('month', s.date) as month, SUM(s.total)::float as total
+        FROM "Sale" s
+        JOIN "Customer" c ON s."customerId" = c.id
+        WHERE c."commercialId" = ${userId}
+        GROUP BY DATE_TRUNC('month', s.date)
+        ORDER BY month DESC
+        LIMIT 36`
+    : prisma.$queryRaw`
+        SELECT DATE_TRUNC('month', date) as month, SUM(total)::float as total
+        FROM "Sale"
+        GROUP BY DATE_TRUNC('month', date)
+        ORDER BY month DESC
+        LIMIT 36`
+
+  const commercialBreakdownPromise: Promise<CommRow[]> = role !== 'COMMERCIAL'
+    ? prisma.$queryRaw`
+        SELECT u.name as commercial, DATE_TRUNC('month', s.date) as month, SUM(s.total)::float as total
+        FROM "Sale" s
+        JOIN "Customer" c ON s."customerId" = c.id
+        JOIN "User" u ON c."commercialId" = u.id
+        GROUP BY u.name, DATE_TRUNC('month', s.date)
+        ORDER BY month DESC, total DESC
+        LIMIT 120`
+    : Promise.resolve([])
+
   const [
     totalCustomers,
     salesThisMonth,
-    salesLastMonth,
     atRisk,
     inactive,
     toVisit,
     pendingTasks,
     topRisk,
     upcomingTasks,
+    monthlyHistory,
+    commercialBreakdown,
   ] = await Promise.all([
     prisma.customer.count({ where: filter }),
     prisma.sale.aggregate({ where: { date: { gte: startOfMonth }, customer: filter }, _sum: { total: true } }),
-    prisma.sale.aggregate({ where: { date: { gte: startOfLastMonth, lt: startOfMonth }, customer: filter }, _sum: { total: true } }),
     prisma.customer.count({ where: { ...filter, OR: [{ status: 'AT_RISK' }, { riskScore: { gte: 50 } }] } }),
     prisma.customer.count({ where: { ...filter, OR: [{ lastPurchaseDate: { lt: sixtyDaysAgo } }, { lastPurchaseDate: null }] } }),
     prisma.customer.count({ where: { ...filter, OR: [{ lastVisitDate: { lt: thirtyDaysAgo } }, { lastVisitDate: null }], status: 'ACTIVE' } }),
@@ -173,9 +203,15 @@ async function buildContext(userId: string, role: string): Promise<string> {
       take: 10,
       select: { title: true, priority: true, dueDate: true, customer: { select: { name: true } } },
     }),
+    monthlyHistoryPromise,
+    commercialBreakdownPromise,
   ])
 
   const fmtDate = (d: Date | null) => d ? new Date(d).toLocaleDateString('pt-PT') : 'sem registo'
+  const fmtMonth = (d: Date) => {
+    const m = new Date(d)
+    return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`
+  }
 
   const riskLines = topRisk.map(c =>
     `- ${c.name} (${c.zone || 'sem zona'}): risco ${c.riskScore.toFixed(0)}/100, última compra ${fmtDate(c.lastPurchaseDate)}, última visita ${fmtDate(c.lastVisitDate)}`
@@ -185,16 +221,35 @@ async function buildContext(userId: string, role: string): Promise<string> {
     `- ${t.title} [${t.priority}] cliente ${t.customer?.name || 'N/A'}, prazo ${fmtDate(t.dueDate)}`
   ).join('\n') || 'nenhuma'
 
+  const historyLines = (monthlyHistory as MonthRow[]).map(r =>
+    `- ${fmtMonth(r.month)}: €${Number(r.total).toFixed(2)}`
+  ).join('\n') || 'sem dados'
+
+  // Build per-commercial breakdown grouped by commercial name
+  let commercialLines = ''
+  if (role !== 'COMMERCIAL' && (commercialBreakdown as CommRow[]).length > 0) {
+    const byComm: Record<string, { month: string; total: number }[]> = {}
+    for (const row of commercialBreakdown as CommRow[]) {
+      if (!byComm[row.commercial]) byComm[row.commercial] = []
+      byComm[row.commercial].push({ month: fmtMonth(row.month), total: Number(row.total) })
+    }
+    commercialLines = '\n\nVENDAS POR VENDEDOR (por mês):\n' + Object.entries(byComm).map(([name, rows]) =>
+      `${name}:\n` + rows.map(r => `  - ${r.month}: €${r.total.toFixed(2)}`).join('\n')
+    ).join('\n')
+  }
+
   const scope = role === 'COMMERCIAL' ? 'do comercial' : 'da equipa toda'
 
   return `DADOS ATUAIS (${scope}), data de hoje ${now.toLocaleDateString('pt-PT')}:
 - Clientes na carteira: ${totalCustomers}
 - Vendas este mês: €${(salesThisMonth._sum.total || 0).toFixed(2)}
-- Vendas mês passado: €${(salesLastMonth._sum.total || 0).toFixed(2)}
 - Clientes em risco/queda: ${atRisk}
 - Clientes inativos (60+ dias sem comprar): ${inactive}
 - Clientes a precisar de visita (30+ dias): ${toVisit}
 - Tarefas pendentes: ${pendingTasks}
+
+HISTÓRICO DE VENDAS (mensal):
+${historyLines}${commercialLines}
 
 TOP CLIENTES EM RISCO:
 ${riskLines}
