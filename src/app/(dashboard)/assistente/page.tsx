@@ -94,7 +94,9 @@ export default function AssistentePage() {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.response || 'Desculpe, não consegui processar o pedido.',
+        content: data.engine === 'rules-fallback' && data.error
+          ? `${data.response || ''}\n\n_Erro OpenAI: ${data.error}_`
+          : data.response || 'Desculpe, não consegui processar o pedido.',
         timestamp: new Date(),
         engine: data.engine,
       }])
