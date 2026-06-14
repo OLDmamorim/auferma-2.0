@@ -287,26 +287,31 @@ async function buildContext(userId: string, role: string): Promise<string> {
     monthlyHistoryPromise,
     commercialBreakdownPromise,
     customerSalesPromise,
-    // All customers with YTD sales grouped by zone
+    // Top 5 customers by YTD sales per zone (for "strongest" queries)
     role === 'COMMERCIAL'
       ? prisma.$queryRaw<CustomerDetailRow[]>`
-          SELECT c.name as customer, c.zone as zone, NULL::text as commercial,
+          SELECT DISTINCT ON (c.zone, ytd_sales) c.name as customer, c.zone as zone, NULL::text as commercial,
             COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as ytd_sales,
             c.status::text as status, c."riskScore"::float as risk
           FROM "Customer" c
           LEFT JOIN "Sale" s ON s."customerId" = c.id
           WHERE c."commercialId" = ${userId}
           GROUP BY c.id, c.name, c.zone, c.status, c."riskScore"
-          ORDER BY c.zone, ytd_sales DESC`
+          ORDER BY c.zone, ytd_sales DESC
+          LIMIT 200`
       : prisma.$queryRaw<CustomerDetailRow[]>`
-          SELECT c.name as customer, c.zone as zone, u.name as commercial,
-            COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as ytd_sales,
-            c.status::text as status, c."riskScore"::float as risk
-          FROM "Customer" c
-          LEFT JOIN "Sale" s ON s."customerId" = c.id
-          LEFT JOIN "User" u ON c."commercialId" = u.id
-          GROUP BY c.id, c.name, c.zone, c.status, c."riskScore", u.name
-          ORDER BY c.zone, ytd_sales DESC`,
+          SELECT * FROM (
+            SELECT c.name as customer, c.zone as zone, u.name as commercial,
+              COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as ytd_sales,
+              c.status::text as status, c."riskScore"::float as risk,
+              ROW_NUMBER() OVER (PARTITION BY c.zone ORDER BY COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0) DESC) as rn
+            FROM "Customer" c
+            LEFT JOIN "Sale" s ON s."customerId" = c.id
+            LEFT JOIN "User" u ON c."commercialId" = u.id
+            GROUP BY c.id, c.name, c.zone, c.status, c."riskScore", u.name
+          ) ranked
+          WHERE rn <= 5
+          ORDER BY zone, ytd_sales DESC`,
     trendPromise,
     zonePromise,
   ])
@@ -382,17 +387,14 @@ async function buildContext(userId: string, role: string): Promise<string> {
 HISTÓRICO DE VENDAS (mensal):
 ${historyLines}${commercialLines}
 
-VENDAS POR CLIENTE (por mês):
-${customerSalesLines}
-
 RESUMO POR ZONA (todos os clientes):
 ${zoneLines}
 
+TOP 5 CLIENTES POR ZONA (por vendas este ano — os mais fortes):
+${allCustomersLines}
+
 CLIENTES EM QUEDA (vendas este ano vs mesmo período do ano passado, maior queda primeiro):
 ${decliningLines}
-
-LISTA COMPLETA DE CLIENTES:
-${allCustomersLines}
 
 TOP CLIENTES EM RISCO:
 ${riskLines}
