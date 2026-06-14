@@ -88,16 +88,25 @@ export default function ConfiguracoesPage() {
     }
     setSaving(true)
     setFormError('')
-    const res = await fetch('/api/users', {
-      method: editUser ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editUser ? { id: editUser.id, ...form } : form),
-    })
-    const data = await res.json()
-    if (!res.ok) { setFormError(data.error || 'Erro ao guardar'); setSaving(false); return }
-    setSaving(false)
-    setShowForm(false)
-    fetchUsers()
+    try {
+      const res = await fetch('/api/users', {
+        method: editUser ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editUser ? { id: editUser.id, ...form } : form),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setFormError(data.error || `Erro ${res.status}`)
+        setSaving(false)
+        return
+      }
+      setSaving(false)
+      setShowForm(false)
+      fetchUsers()
+    } catch (e) {
+      setFormError('Erro de ligação. Tente novamente.')
+      setSaving(false)
+    }
   }
 
   async function toggleActive(u: User) {
@@ -195,7 +204,11 @@ export default function ConfiguracoesPage() {
                 </select>
               </div>
             </div>
-            {formError && <p className="text-xs text-red-600">{formError}</p>}
+            {formError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <p className="text-sm text-red-700 font-medium">{formError}</p>
+              </div>
+            )}
             <div className="flex gap-2 pt-1">
               <button
                 onClick={submitForm}
