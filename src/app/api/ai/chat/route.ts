@@ -163,23 +163,26 @@ async function buildContext(userId: string, role: string): Promise<string> {
         ORDER BY month DESC
         LIMIT 36`
 
+  // Top 50 customers by total sales (last 12 months) with monthly breakdown
+  const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1)
   const customerSalesPromise: Promise<CustomerSalesRow[]> = role === 'COMMERCIAL'
     ? prisma.$queryRaw`
         SELECT c.name as customer, NULL::text as commercial, DATE_TRUNC('month', s.date) as month, SUM(s.total)::float as total
         FROM "Sale" s
         JOIN "Customer" c ON s."customerId" = c.id
-        WHERE c."commercialId" = ${userId}
+        WHERE c."commercialId" = ${userId} AND s.date >= ${twelveMonthsAgo}
         GROUP BY c.name, DATE_TRUNC('month', s.date)
-        ORDER BY month DESC, total DESC
+        ORDER BY total DESC
         LIMIT 200`
     : prisma.$queryRaw`
         SELECT c.name as customer, u.name as commercial, DATE_TRUNC('month', s.date) as month, SUM(s.total)::float as total
         FROM "Sale" s
         JOIN "Customer" c ON s."customerId" = c.id
         LEFT JOIN "User" u ON c."commercialId" = u.id
+        WHERE s.date >= ${twelveMonthsAgo}
         GROUP BY c.name, u.name, DATE_TRUNC('month', s.date)
-        ORDER BY month DESC, total DESC
-        LIMIT 500`
+        ORDER BY total DESC
+        LIMIT 300`
 
   const commercialBreakdownPromise: Promise<CommRow[]> = role !== 'COMMERCIAL'
     ? prisma.$queryRaw`
@@ -227,10 +230,12 @@ async function buildContext(userId: string, role: string): Promise<string> {
     monthlyHistoryPromise,
     commercialBreakdownPromise,
     customerSalesPromise,
+    // Top 100 customers by risk + recent activity for full profile
     prisma.customer.findMany({
       where: filter,
       select: { name: true, zone: true, status: true, riskScore: true, lastPurchaseDate: true, lastVisitDate: true, commercial: { select: { name: true } } },
-      orderBy: { name: 'asc' },
+      orderBy: [{ riskScore: 'desc' }, { lastPurchaseDate: 'desc' }],
+      take: 100,
     }),
   ])
 
