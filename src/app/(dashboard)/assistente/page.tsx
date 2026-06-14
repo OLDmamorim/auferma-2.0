@@ -8,6 +8,7 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  engine?: string
 }
 
 const suggestions = [
@@ -95,6 +96,7 @@ export default function AssistentePage() {
         role: 'assistant',
         content: data.response || 'Desculpe, não consegui processar o pedido.',
         timestamp: new Date(),
+        engine: data.engine,
       }])
     } catch {
       setMessages(prev => [...prev, {
@@ -160,6 +162,11 @@ export default function AssistentePage() {
                   )}
                   <p className={`text-xs mt-1.5 ${msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}>
                     {msg.timestamp.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                    {msg.engine && msg.role === 'assistant' && (
+                      <span className="ml-2 opacity-60">
+                        {msg.engine === 'openai' ? '· GPT-4o' : msg.engine === 'rules-fallback' ? '· regras (OpenAI falhou)' : '· regras'}
+                      </span>
+                    )}
                   </p>
                 </div>
                 {msg.role === 'user' && (

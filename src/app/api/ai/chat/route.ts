@@ -79,6 +79,20 @@ async function processQuery(query: string, userId: string, role: string): Promis
     ).join('\n\n')}`
   }
 
+  if (q.includes('venda') || q.includes('fatura') || q.includes('objetivo') || q.includes('meta') || q.includes('ponto')) {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const [salesMonth, target] = await Promise.all([
+      prisma.sale.aggregate({ where: { date: { gte: startOfMonth }, customer: filter }, _sum: { total: true } }),
+      prisma.commercialTarget.findFirst({
+        where: { ...(role === 'COMMERCIAL' ? { userId } : {}), month: now.getMonth() + 1, year: now.getFullYear() },
+      }),
+    ])
+    const total = salesMonth._sum.total || 0
+    const tgt = target?.target || 0
+    const pct = tgt > 0 ? Math.round((total / tgt) * 100) : null
+    return `**Vendas este mês:**\n\n• Total: **€${total.toFixed(2)}**\n• Objetivo: **${tgt > 0 ? `€${tgt.toFixed(2)}` : 'não definido'}**${pct !== null ? `\n• Progresso: **${pct}%** do objetivo` : ''}\n\n${pct !== null ? (pct >= 100 ? '✅ Objetivo atingido!' : pct >= 75 ? '🟡 Bom ritmo, continue assim.' : '🔴 Abaixo do esperado — acelere as vendas.') : ''}`
+  }
+
   if (q.includes('plano') || q.includes('semana')) {
     const [pendingTasks, customersToVisit] = await Promise.all([
       prisma.task.count({ where: { ...(role === 'COMMERCIAL' ? { assignedToId: userId } : {}), status: { in: ['PENDING', 'IN_PROGRESS'] } } }),
