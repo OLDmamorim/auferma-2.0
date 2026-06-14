@@ -134,7 +134,7 @@ async function processQuery(query: string, userId: string, role: string): Promis
 }
 
 // ─── Context snapshot for the LLM ──────────────────────────────────────────────
-async function buildContext(userId: string, role: string): Promise<string> {
+async function buildContext(userId: string, role: string, userMessage?: string): Promise<string> {
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
@@ -150,8 +150,45 @@ async function buildContext(userId: string, role: string): Promise<string> {
   type ZoneRow = { zone: string | null; total_customers: number; total_sales: number }
   type CustomerDetailRow = { customer: string; zone: string | null; commercial: string | null; ytd_sales: number; status: string; risk: number }
 
-  // Zone summary: customer count + YTD sales per zone (all customers)
+  // Detect if user is asking about a specific zone → fetch all customers in that zone
   const thisYearStart = new Date(now.getFullYear(), 0, 1)
+
+  let focusedZoneContext = ''
+  if (userMessage) {
+    // Get all known zones and check if message mentions one
+    const zones: { zone: string }[] = await prisma.$queryRaw`SELECT DISTINCT zone FROM "Customer" WHERE zone IS NOT NULL ORDER BY zone`
+    const mentionedZone = zones.find(z => userMessage.toLowerCase().includes(z.zone.toLowerCase()))
+    if (mentionedZone) {
+      const zoneClients: CustomerDetailRow[] = role === 'COMMERCIAL'
+        ? await prisma.$queryRaw`
+            SELECT c.name as customer, c.zone as zone, NULL::text as commercial,
+              COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as ytd_sales,
+              c.status::text as status, c."riskScore"::float as risk
+            FROM "Customer" c
+            LEFT JOIN "Sale" s ON s."customerId" = c.id
+            WHERE c."commercialId" = ${userId} AND c.zone ILIKE ${mentionedZone.zone}
+            GROUP BY c.id, c.name, c.zone, c.status, c."riskScore"
+            ORDER BY ytd_sales DESC`
+        : await prisma.$queryRaw`
+            SELECT c.name as customer, c.zone as zone, u.name as commercial,
+              COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as ytd_sales,
+              c.status::text as status, c."riskScore"::float as risk
+            FROM "Customer" c
+            LEFT JOIN "Sale" s ON s."customerId" = c.id
+            LEFT JOIN "User" u ON c."commercialId" = u.id
+            WHERE c.zone ILIKE ${mentionedZone.zone}
+            GROUP BY c.id, c.name, c.zone, c.status, c."riskScore", u.name
+            ORDER BY ytd_sales DESC`
+      if (zoneClients.length > 0) {
+        const clientLines = zoneClients.map(c =>
+          `- ${c.customer}${c.commercial ? ` [${c.commercial}]` : ''}: vendas este ano €${Number(c.ytd_sales).toFixed(2)}, estado: ${c.status}, risco: ${Math.round(Number(c.risk))}/100`
+        ).join('\n')
+        focusedZoneContext = `\n\nTODOS OS CLIENTES EM ${mentionedZone.zone.toUpperCase()} (${zoneClients.length} clientes):\n${clientLines}`
+      }
+    }
+  }
+
+  // Zone summary: customer count + YTD sales per zone (all customers)
   const zonePromise: Promise<ZoneRow[]> = role === 'COMMERCIAL'
     ? prisma.$queryRaw`
         SELECT c.zone, COUNT(DISTINCT c.id)::int as total_customers,
@@ -400,7 +437,7 @@ TOP CLIENTES EM RISCO:
 ${riskLines}
 
 TAREFAS PENDENTES:
-${taskLines}`
+${taskLines}${focusedZoneContext}`
 }
 
 // ─── OpenAI call ───────────────────────────────────────────────────────────────
@@ -470,7 +507,7 @@ export async function POST(req: NextRequest) {
 
   // OpenAI engine with live data context
   try {
-    const context = await buildContext(userId, role)
+    const context = await buildContext(userId, role, message)
     const response = await askOpenAI(apiKey, context, Array.isArray(history) ? history : [], message, userName)
     return NextResponse.json({ response, engine: 'openai' })
   } catch (e: any) {
