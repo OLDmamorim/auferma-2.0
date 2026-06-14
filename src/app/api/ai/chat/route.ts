@@ -79,8 +79,8 @@ async function processQuery(query: string, userId: string, role: string): Promis
     ).join('\n\n')}`
   }
 
-  if (q.includes('venda') || q.includes('fatura') || q.includes('objetivo') || q.includes('meta') || q.includes('ponto') || q.includes('mês passado') || q.includes('mes passado') || q.includes('passado')) {
-    const isLastMonth = q.includes('passado')
+  if (q.includes('venda') || q.includes('fatura') || q.includes('objetivo') || q.includes('meta') || q.includes('ponto') || q.includes('mês passado') || q.includes('mes passado') || (q.includes('passado') && !q.includes('ano'))) {
+    const isLastMonth = q.includes('passado') && !q.includes('ano')
     const startOfMonth = isLastMonth
       ? new Date(now.getFullYear(), now.getMonth() - 1, 1)
       : new Date(now.getFullYear(), now.getMonth(), 1)
@@ -101,6 +101,18 @@ async function processQuery(query: string, userId: string, role: string): Promis
     const pct = tgt > 0 ? Math.round((total / tgt) * 100) : null
     const label = isLastMonth ? 'mês passado' : 'este mês'
     return `**Vendas ${label}:**\n\n• Total: **€${total.toFixed(2)}**\n• Objetivo: **${tgt > 0 ? `€${tgt.toFixed(2)}` : 'não definido'}**${pct !== null ? `\n• Progresso: **${pct}%** do objetivo` : ''}\n\n${pct !== null ? (pct >= 100 ? '✅ Objetivo atingido!' : pct >= 75 ? '🟡 Bom ritmo.' : '🔴 Abaixo do esperado.') : ''}`
+  }
+
+  if (q.includes('ano passado') || (q.includes('ano') && q.includes('passado'))) {
+    const lastYear = now.getFullYear() - 1
+    const startOfYear = new Date(lastYear, 0, 1)
+    const endOfYear = new Date(lastYear, 11, 31, 23, 59, 59)
+    const sales = await prisma.sale.aggregate({
+      where: { date: { gte: startOfYear, lte: endOfYear }, customer: filter },
+      _sum: { total: true },
+    })
+    const total = sales._sum.total || 0
+    return `**Vendas em ${lastYear}:**\n\n• Total: **€${total.toFixed(2)}**\n\n_Nota: objetivos anuais não estão disponíveis neste assistente._`
   }
 
   if (q.includes('plano') || q.includes('semana')) {
