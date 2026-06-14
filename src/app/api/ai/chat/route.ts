@@ -145,6 +145,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
   // Monthly sales history (all available months, grouped)
   type MonthRow = { month: Date; total: number }
   type CommRow = { commercial: string; month: Date; total: number }
+  type CustomerSalesRow = { customer: string; commercial: string | null; total: number; month: Date }
 
   const monthlyHistoryPromise: Promise<MonthRow[]> = role === 'COMMERCIAL'
     ? prisma.$queryRaw`
@@ -161,6 +162,24 @@ async function buildContext(userId: string, role: string): Promise<string> {
         GROUP BY DATE_TRUNC('month', date)
         ORDER BY month DESC
         LIMIT 36`
+
+  const customerSalesPromise: Promise<CustomerSalesRow[]> = role === 'COMMERCIAL'
+    ? prisma.$queryRaw`
+        SELECT c.name as customer, NULL::text as commercial, DATE_TRUNC('month', s.date) as month, SUM(s.total)::float as total
+        FROM "Sale" s
+        JOIN "Customer" c ON s."customerId" = c.id
+        WHERE c."commercialId" = ${userId}
+        GROUP BY c.name, DATE_TRUNC('month', s.date)
+        ORDER BY month DESC, total DESC
+        LIMIT 200`
+    : prisma.$queryRaw`
+        SELECT c.name as customer, u.name as commercial, DATE_TRUNC('month', s.date) as month, SUM(s.total)::float as total
+        FROM "Sale" s
+        JOIN "Customer" c ON s."customerId" = c.id
+        LEFT JOIN "User" u ON c."commercialId" = u.id
+        GROUP BY c.name, u.name, DATE_TRUNC('month', s.date)
+        ORDER BY month DESC, total DESC
+        LIMIT 500`
 
   const commercialBreakdownPromise: Promise<CommRow[]> = role !== 'COMMERCIAL'
     ? prisma.$queryRaw`
@@ -184,6 +203,8 @@ async function buildContext(userId: string, role: string): Promise<string> {
     upcomingTasks,
     monthlyHistory,
     commercialBreakdown,
+    customerSalesHistory,
+    allCustomers,
   ] = await Promise.all([
     prisma.customer.count({ where: filter }),
     prisma.sale.aggregate({ where: { date: { gte: startOfMonth }, customer: filter }, _sum: { total: true } }),
@@ -205,6 +226,12 @@ async function buildContext(userId: string, role: string): Promise<string> {
     }),
     monthlyHistoryPromise,
     commercialBreakdownPromise,
+    customerSalesPromise,
+    prisma.customer.findMany({
+      where: filter,
+      select: { name: true, zone: true, status: true, riskScore: true, lastPurchaseDate: true, lastVisitDate: true, commercial: { select: { name: true } } },
+      orderBy: { name: 'asc' },
+    }),
   ])
 
   const fmtDate = (d: Date | null) => d ? new Date(d).toLocaleDateString('pt-PT') : 'sem registo'
@@ -225,7 +252,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
     `- ${fmtMonth(r.month)}: €${Number(r.total).toFixed(2)}`
   ).join('\n') || 'sem dados'
 
-  // Build per-commercial breakdown grouped by commercial name
+  // Per-commercial monthly breakdown
   let commercialLines = ''
   if (role !== 'COMMERCIAL' && (commercialBreakdown as CommRow[]).length > 0) {
     const byComm: Record<string, { month: string; total: number }[]> = {}
@@ -237,6 +264,22 @@ async function buildContext(userId: string, role: string): Promise<string> {
       `${name}:\n` + rows.map(r => `  - ${r.month}: €${r.total.toFixed(2)}`).join('\n')
     ).join('\n')
   }
+
+  // Per-customer monthly sales
+  const byCustomer: Record<string, { commercial: string | null; months: { month: string; total: number }[] }> = {}
+  for (const row of customerSalesHistory as CustomerSalesRow[]) {
+    if (!byCustomer[row.customer]) byCustomer[row.customer] = { commercial: row.commercial, months: [] }
+    byCustomer[row.customer].months.push({ month: fmtMonth(row.month), total: Number(row.total) })
+  }
+  const customerSalesLines = Object.entries(byCustomer).map(([name, data]) => {
+    const commLabel = data.commercial ? ` [${data.commercial}]` : ''
+    return `${name}${commLabel}:\n` + data.months.map(r => `  - ${r.month}: €${r.total.toFixed(2)}`).join('\n')
+  }).join('\n') || 'sem dados'
+
+  // All customers list
+  const allCustomersLines = (allCustomers as any[]).map(c =>
+    `- ${c.name} | zona: ${c.zone || 'N/D'} | estado: ${c.status} | risco: ${c.riskScore.toFixed(0)}/100 | última compra: ${fmtDate(c.lastPurchaseDate)} | última visita: ${fmtDate(c.lastVisitDate)}${c.commercial ? ` | vendedor: ${c.commercial.name}` : ''}`
+  ).join('\n') || 'nenhum'
 
   const scope = role === 'COMMERCIAL' ? 'do comercial' : 'da equipa toda'
 
@@ -250,6 +293,12 @@ async function buildContext(userId: string, role: string): Promise<string> {
 
 HISTÓRICO DE VENDAS (mensal):
 ${historyLines}${commercialLines}
+
+VENDAS POR CLIENTE (por mês):
+${customerSalesLines}
+
+LISTA COMPLETA DE CLIENTES:
+${allCustomersLines}
 
 TOP CLIENTES EM RISCO:
 ${riskLines}
