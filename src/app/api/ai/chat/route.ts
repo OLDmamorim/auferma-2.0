@@ -147,9 +147,28 @@ async function buildContext(userId: string, role: string): Promise<string> {
   type CommRow = { commercial: string; month: Date; total: number }
   type CustomerSalesRow = { customer: string; commercial: string | null; total: number; month: Date }
   type TrendRow = { customer: string; zone: string | null; commercial: string | null; this_ytd: number; last_ytd: number; delta: number }
+  type ZoneRow = { zone: string | null; total_customers: number; total_sales: number }
+
+  // Zone summary: customer count + YTD sales per zone (all customers)
+  const thisYearStart = new Date(now.getFullYear(), 0, 1)
+  const zonePromise: Promise<ZoneRow[]> = role === 'COMMERCIAL'
+    ? prisma.$queryRaw`
+        SELECT c.zone, COUNT(DISTINCT c.id)::int as total_customers,
+          COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as total_sales
+        FROM "Customer" c
+        LEFT JOIN "Sale" s ON s."customerId" = c.id
+        WHERE c."commercialId" = ${userId}
+        GROUP BY c.zone
+        ORDER BY total_customers DESC`
+    : prisma.$queryRaw`
+        SELECT c.zone, COUNT(DISTINCT c.id)::int as total_customers,
+          COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as total_sales
+        FROM "Customer" c
+        LEFT JOIN "Sale" s ON s."customerId" = c.id
+        GROUP BY c.zone
+        ORDER BY total_customers DESC`
 
   // Year-to-date trend per customer: this year vs same period last year (declining first)
-  const thisYearStart = new Date(now.getFullYear(), 0, 1)
   const lastYearStart = new Date(now.getFullYear() - 1, 0, 1)
   const lastYearSamePoint = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
   const trendPromise: Promise<TrendRow[]> = role === 'COMMERCIAL'
@@ -244,6 +263,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
     customerSalesHistory,
     allCustomers,
     decliningCustomers,
+    zoneSummary,
   ] = await Promise.all([
     prisma.customer.count({ where: filter }),
     prisma.sale.aggregate({ where: { date: { gte: startOfMonth }, customer: filter }, _sum: { total: true } }),
@@ -274,6 +294,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
       take: 100,
     }),
     trendPromise,
+    zonePromise,
   ])
 
   const fmtDate = (d: Date | null) => d ? new Date(d).toLocaleDateString('pt-PT') : 'sem registo'
@@ -318,6 +339,11 @@ async function buildContext(userId: string, role: string): Promise<string> {
     return `${name}${commLabel}:\n` + data.months.map(r => `  - ${r.month}: €${r.total.toFixed(2)}`).join('\n')
   }).join('\n') || 'sem dados'
 
+  // Zone summary
+  const zoneLines = (zoneSummary as ZoneRow[]).map(r =>
+    `- ${r.zone || 'sem zona'}: ${r.total_customers} clientes | vendas este ano: €${Number(r.total_sales).toFixed(2)}`
+  ).join('\n') || 'sem dados'
+
   // Declining customers (year-to-date vs same period last year)
   const decliningLines = (decliningCustomers as TrendRow[]).map(r => {
     const drop = r.last_ytd > 0 ? Math.round((Math.abs(r.delta) / r.last_ytd) * 100) : 0
@@ -344,6 +370,9 @@ ${historyLines}${commercialLines}
 
 VENDAS POR CLIENTE (por mês):
 ${customerSalesLines}
+
+RESUMO POR ZONA (todos os clientes):
+${zoneLines}
 
 CLIENTES EM QUEDA (vendas este ano vs mesmo período do ano passado, maior queda primeiro):
 ${decliningLines}
