@@ -79,18 +79,28 @@ async function processQuery(query: string, userId: string, role: string): Promis
     ).join('\n\n')}`
   }
 
-  if (q.includes('venda') || q.includes('fatura') || q.includes('objetivo') || q.includes('meta') || q.includes('ponto')) {
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  if (q.includes('venda') || q.includes('fatura') || q.includes('objetivo') || q.includes('meta') || q.includes('ponto') || q.includes('mês passado') || q.includes('mes passado') || q.includes('passado')) {
+    const isLastMonth = q.includes('passado')
+    const startOfMonth = isLastMonth
+      ? new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      : new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = isLastMonth
+      ? new Date(now.getFullYear(), now.getMonth(), 1)
+      : now
+    const targetMonth = isLastMonth ? (now.getMonth() === 0 ? 12 : now.getMonth()) : now.getMonth() + 1
+    const targetYear = isLastMonth && now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+
     const [salesMonth, target] = await Promise.all([
-      prisma.sale.aggregate({ where: { date: { gte: startOfMonth }, customer: filter }, _sum: { total: true } }),
+      prisma.sale.aggregate({ where: { date: { gte: startOfMonth, lt: endOfMonth }, customer: filter }, _sum: { total: true } }),
       prisma.commercialTarget.findFirst({
-        where: { ...(role === 'COMMERCIAL' ? { userId } : {}), month: now.getMonth() + 1, year: now.getFullYear() },
+        where: { ...(role === 'COMMERCIAL' ? { userId } : {}), month: targetMonth, year: targetYear },
       }),
     ])
     const total = salesMonth._sum.total || 0
     const tgt = target?.target || 0
     const pct = tgt > 0 ? Math.round((total / tgt) * 100) : null
-    return `**Vendas este mês:**\n\n• Total: **€${total.toFixed(2)}**\n• Objetivo: **${tgt > 0 ? `€${tgt.toFixed(2)}` : 'não definido'}**${pct !== null ? `\n• Progresso: **${pct}%** do objetivo` : ''}\n\n${pct !== null ? (pct >= 100 ? '✅ Objetivo atingido!' : pct >= 75 ? '🟡 Bom ritmo, continue assim.' : '🔴 Abaixo do esperado — acelere as vendas.') : ''}`
+    const label = isLastMonth ? 'mês passado' : 'este mês'
+    return `**Vendas ${label}:**\n\n• Total: **€${total.toFixed(2)}**\n• Objetivo: **${tgt > 0 ? `€${tgt.toFixed(2)}` : 'não definido'}**${pct !== null ? `\n• Progresso: **${pct}%** do objetivo` : ''}\n\n${pct !== null ? (pct >= 100 ? '✅ Objetivo atingido!' : pct >= 75 ? '🟡 Bom ritmo.' : '🔴 Abaixo do esperado.') : ''}`
   }
 
   if (q.includes('plano') || q.includes('semana')) {
