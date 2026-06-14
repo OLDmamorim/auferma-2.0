@@ -146,6 +146,41 @@ async function buildContext(userId: string, role: string): Promise<string> {
   type MonthRow = { month: Date; total: number }
   type CommRow = { commercial: string; month: Date; total: number }
   type CustomerSalesRow = { customer: string; commercial: string | null; total: number; month: Date }
+  type TrendRow = { customer: string; zone: string | null; commercial: string | null; this_ytd: number; last_ytd: number; delta: number }
+
+  // Year-to-date trend per customer: this year vs same period last year (declining first)
+  const thisYearStart = new Date(now.getFullYear(), 0, 1)
+  const lastYearStart = new Date(now.getFullYear() - 1, 0, 1)
+  const lastYearSamePoint = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+  const trendPromise: Promise<TrendRow[]> = role === 'COMMERCIAL'
+    ? prisma.$queryRaw`
+        SELECT c.name as customer, c.zone as zone, NULL::text as commercial,
+          COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart} AND s.date <= ${now}), 0)::float as this_ytd,
+          COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${lastYearStart} AND s.date <= ${lastYearSamePoint}), 0)::float as last_ytd,
+          (COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart} AND s.date <= ${now}), 0)
+           - COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${lastYearStart} AND s.date <= ${lastYearSamePoint}), 0))::float as delta
+        FROM "Customer" c
+        LEFT JOIN "Sale" s ON s."customerId" = c.id
+        WHERE c."commercialId" = ${userId}
+        GROUP BY c.name, c.zone
+        HAVING (COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart} AND s.date <= ${now}), 0)
+           - COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${lastYearStart} AND s.date <= ${lastYearSamePoint}), 0)) < 0
+        ORDER BY delta ASC
+        LIMIT 150`
+    : prisma.$queryRaw`
+        SELECT c.name as customer, c.zone as zone, u.name as commercial,
+          COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart} AND s.date <= ${now}), 0)::float as this_ytd,
+          COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${lastYearStart} AND s.date <= ${lastYearSamePoint}), 0)::float as last_ytd,
+          (COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart} AND s.date <= ${now}), 0)
+           - COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${lastYearStart} AND s.date <= ${lastYearSamePoint}), 0))::float as delta
+        FROM "Customer" c
+        LEFT JOIN "Sale" s ON s."customerId" = c.id
+        LEFT JOIN "User" u ON c."commercialId" = u.id
+        GROUP BY c.name, c.zone, u.name
+        HAVING (COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart} AND s.date <= ${now}), 0)
+           - COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${lastYearStart} AND s.date <= ${lastYearSamePoint}), 0)) < 0
+        ORDER BY delta ASC
+        LIMIT 200`
 
   const monthlyHistoryPromise: Promise<MonthRow[]> = role === 'COMMERCIAL'
     ? prisma.$queryRaw`
@@ -208,6 +243,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
     commercialBreakdown,
     customerSalesHistory,
     allCustomers,
+    decliningCustomers,
   ] = await Promise.all([
     prisma.customer.count({ where: filter }),
     prisma.sale.aggregate({ where: { date: { gte: startOfMonth }, customer: filter }, _sum: { total: true } }),
@@ -237,6 +273,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
       orderBy: [{ riskScore: 'desc' }, { lastPurchaseDate: 'desc' }],
       take: 100,
     }),
+    trendPromise,
   ])
 
   const fmtDate = (d: Date | null) => d ? new Date(d).toLocaleDateString('pt-PT') : 'sem registo'
@@ -281,6 +318,12 @@ async function buildContext(userId: string, role: string): Promise<string> {
     return `${name}${commLabel}:\n` + data.months.map(r => `  - ${r.month}: €${r.total.toFixed(2)}`).join('\n')
   }).join('\n') || 'sem dados'
 
+  // Declining customers (year-to-date vs same period last year)
+  const decliningLines = (decliningCustomers as TrendRow[]).map(r => {
+    const drop = r.last_ytd > 0 ? Math.round((Math.abs(r.delta) / r.last_ytd) * 100) : 0
+    return `- ${r.customer} | zona: ${r.zone || 'N/D'}${r.commercial ? ` | vendedor: ${r.commercial}` : ''} | este ano: €${Number(r.this_ytd).toFixed(2)} | mesmo período ano passado: €${Number(r.last_ytd).toFixed(2)} | queda: €${Math.abs(r.delta).toFixed(2)} (-${drop}%)`
+  }).join('\n') || 'nenhum cliente em queda'
+
   // All customers list
   const allCustomersLines = (allCustomers as any[]).map(c =>
     `- ${c.name} | zona: ${c.zone || 'N/D'} | estado: ${c.status} | risco: ${c.riskScore.toFixed(0)}/100 | última compra: ${fmtDate(c.lastPurchaseDate)} | última visita: ${fmtDate(c.lastVisitDate)}${c.commercial ? ` | vendedor: ${c.commercial.name}` : ''}`
@@ -301,6 +344,9 @@ ${historyLines}${commercialLines}
 
 VENDAS POR CLIENTE (por mês):
 ${customerSalesLines}
+
+CLIENTES EM QUEDA (vendas este ano vs mesmo período do ano passado, maior queda primeiro):
+${decliningLines}
 
 LISTA COMPLETA DE CLIENTES:
 ${allCustomersLines}
@@ -323,6 +369,11 @@ async function askOpenAI(
   const system = `És o Assistente Comercial Auferma, da Auferma 2.0 — uma plataforma de inteligência comercial para uma empresa B2B de importação e distribuição. Falas com ${userName}.
 
 Responde sempre em português de Portugal, de forma clara, direta e prática. Usa **negrito** para destacar e listas com marcadores quando útil. Baseia-te SEMPRE nos dados fornecidos abaixo — não inventes clientes, números nem datas. Se a pergunta não tiver resposta nos dados, diz que não tens essa informação e sugere o que o utilizador pode fazer. Sê conciso: vai direto ao que interessa.
+
+Notas importantes sobre os dados:
+- "Clientes em queda/decréscimo" referem-se à secção CLIENTES EM QUEDA (comparação de vendas ano a ano), NÃO ao campo "estado" do cliente. Um cliente com estado "ACTIVE" pode estar em queda de vendas.
+- Quando pedirem análise por zona/região, filtra a lista de clientes pelo campo "zona".
+- Para planos de visitas a clientes em queda, usa a secção CLIENTES EM QUEDA cruzada com a zona pedida.
 
 ${context}`
 
