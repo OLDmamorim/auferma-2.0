@@ -20,13 +20,19 @@ const suggestions = [
 ]
 
 function MessageContent({ content }: { content: string }) {
-  // Render markdown-like content: **bold**, bullet points, line breaks
   const lines = content.split('\n')
   return (
     <div className="space-y-1">
       {lines.map((line, i) => {
         if (!line.trim()) return <div key={i} className="h-2" />
-        // Bold text **text**
+        // H3
+        if (line.startsWith('### ')) {
+          return <p key={i} className="text-sm font-bold text-gray-800 mt-2">{line.slice(4)}</p>
+        }
+        // H2
+        if (line.startsWith('## ')) {
+          return <p key={i} className="text-sm font-bold text-gray-900 mt-2">{line.slice(3)}</p>
+        }
         const parts = line.split(/\*\*(.*?)\*\*/g)
         return (
           <p key={i} className="text-sm leading-relaxed">

@@ -148,6 +148,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
   type CustomerSalesRow = { customer: string; commercial: string | null; total: number; month: Date }
   type TrendRow = { customer: string; zone: string | null; commercial: string | null; this_ytd: number; last_ytd: number; delta: number }
   type ZoneRow = { zone: string | null; total_customers: number; total_sales: number }
+  type CustomerDetailRow = { customer: string; zone: string | null; commercial: string | null; ytd_sales: number; status: string; risk: number }
 
   // Zone summary: customer count + YTD sales per zone (all customers)
   const thisYearStart = new Date(now.getFullYear(), 0, 1)
@@ -286,13 +287,26 @@ async function buildContext(userId: string, role: string): Promise<string> {
     monthlyHistoryPromise,
     commercialBreakdownPromise,
     customerSalesPromise,
-    // Top 100 customers by risk + recent activity for full profile
-    prisma.customer.findMany({
-      where: filter,
-      select: { name: true, zone: true, status: true, riskScore: true, lastPurchaseDate: true, lastVisitDate: true, commercial: { select: { name: true } } },
-      orderBy: [{ riskScore: 'desc' }, { lastPurchaseDate: 'desc' }],
-      take: 100,
-    }),
+    // All customers with YTD sales grouped by zone
+    role === 'COMMERCIAL'
+      ? prisma.$queryRaw<CustomerDetailRow[]>`
+          SELECT c.name as customer, c.zone as zone, NULL::text as commercial,
+            COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as ytd_sales,
+            c.status::text as status, c."riskScore"::float as risk
+          FROM "Customer" c
+          LEFT JOIN "Sale" s ON s."customerId" = c.id
+          WHERE c."commercialId" = ${userId}
+          GROUP BY c.id, c.name, c.zone, c.status, c."riskScore"
+          ORDER BY c.zone, ytd_sales DESC`
+      : prisma.$queryRaw<CustomerDetailRow[]>`
+          SELECT c.name as customer, c.zone as zone, u.name as commercial,
+            COALESCE(SUM(s.total) FILTER (WHERE s.date >= ${thisYearStart}), 0)::float as ytd_sales,
+            c.status::text as status, c."riskScore"::float as risk
+          FROM "Customer" c
+          LEFT JOIN "Sale" s ON s."customerId" = c.id
+          LEFT JOIN "User" u ON c."commercialId" = u.id
+          GROUP BY c.id, c.name, c.zone, c.status, c."riskScore", u.name
+          ORDER BY c.zone, ytd_sales DESC`,
     trendPromise,
     zonePromise,
   ])
@@ -350,9 +364,9 @@ async function buildContext(userId: string, role: string): Promise<string> {
     return `- ${r.customer} | zona: ${r.zone || 'N/D'}${r.commercial ? ` | vendedor: ${r.commercial}` : ''} | este ano: €${Number(r.this_ytd).toFixed(2)} | mesmo período ano passado: €${Number(r.last_ytd).toFixed(2)} | queda: €${Math.abs(r.delta).toFixed(2)} (-${drop}%)`
   }).join('\n') || 'nenhum cliente em queda'
 
-  // All customers list
-  const allCustomersLines = (allCustomers as any[]).map(c =>
-    `- ${c.name} | zona: ${c.zone || 'N/D'} | estado: ${c.status} | risco: ${c.riskScore.toFixed(0)}/100 | última compra: ${fmtDate(c.lastPurchaseDate)} | última visita: ${fmtDate(c.lastVisitDate)}${c.commercial ? ` | vendedor: ${c.commercial.name}` : ''}`
+  // All customers list (grouped by zone, sorted by YTD sales)
+  const allCustomersLines = (allCustomers as CustomerDetailRow[]).map(c =>
+    `- ${c.customer} | zona: ${c.zone || 'N/D'} | vendas este ano: €${Number(c.ytd_sales).toFixed(2)} | estado: ${c.status} | risco: ${Math.round(Number(c.risk))}/100${c.commercial ? ` | vendedor: ${c.commercial}` : ''}`
   ).join('\n') || 'nenhum'
 
   const scope = role === 'COMMERCIAL' ? 'do comercial' : 'da equipa toda'
