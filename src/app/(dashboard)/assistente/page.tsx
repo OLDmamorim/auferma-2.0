@@ -82,7 +82,12 @@ export default function AssistentePage() {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg }),
+        body: JSON.stringify({
+          message: msg,
+          history: messages
+            .filter(m => m.id !== '0')
+            .map(m => ({ role: m.role, content: m.content })),
+        }),
       })
       const data = await res.json()
       setMessages(prev => [...prev, {
@@ -110,7 +115,7 @@ export default function AssistentePage() {
         actions={
           <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            Sistema de regras ativo · OpenAI pronto para integrar
+            IA generativa ativa
           </div>
         }
       />
@@ -214,9 +219,9 @@ export default function AssistentePage() {
           </div>
 
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-            <h3 className="text-xs font-semibold text-blue-800 mb-2">🤖 Integração OpenAI</h3>
+            <h3 className="text-xs font-semibold text-blue-800 mb-2">🤖 Como funciona</h3>
             <p className="text-xs text-blue-700">
-              Para ativar o assistente com IA generativa, adicione a variável <code className="bg-blue-100 px-1 rounded">OPENAI_API_KEY</code> nas configurações do Netlify.
+              O assistente analisa os dados reais da sua carteira (clientes, vendas, visitas, tarefas e risco) e responde a qualquer pergunta com IA generativa. Escreva livremente.
             </p>
           </div>
         </div>
