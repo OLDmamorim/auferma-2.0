@@ -120,9 +120,23 @@ export default function AssistentePage() {
         }
       />
 
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+        {/* Suggestions - mobile: horizontal scroll row, desktop: sidebar */}
+        <div className="lg:hidden flex gap-2 overflow-x-auto pb-1 flex-shrink-0">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => sendMessage(s)}
+              disabled={loading}
+              className="flex-shrink-0 text-xs text-gray-700 bg-white border border-gray-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 px-3 py-2 rounded-lg transition disabled:opacity-50"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden min-h-0">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map(msg => (
@@ -200,8 +214,8 @@ export default function AssistentePage() {
           </div>
         </div>
 
-        {/* Sidebar with suggestions */}
-        <div className="w-64 flex flex-col gap-4">
+        {/* Sidebar with suggestions - desktop only */}
+        <div className="hidden lg:flex w-64 flex-col gap-4">
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Sugestões</h3>
             <div className="space-y-2">
