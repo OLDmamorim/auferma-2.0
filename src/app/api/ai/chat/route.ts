@@ -138,6 +138,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const filter = role === 'COMMERCIAL' ? { commercialId: userId } : {}
   const taskFilter = role === 'COMMERCIAL' ? { assignedToId: userId } : {}
@@ -145,6 +146,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
   const [
     totalCustomers,
     salesThisMonth,
+    salesLastMonth,
     atRisk,
     inactive,
     toVisit,
@@ -154,6 +156,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
   ] = await Promise.all([
     prisma.customer.count({ where: filter }),
     prisma.sale.aggregate({ where: { date: { gte: startOfMonth }, customer: filter }, _sum: { total: true } }),
+    prisma.sale.aggregate({ where: { date: { gte: startOfLastMonth, lt: startOfMonth }, customer: filter }, _sum: { total: true } }),
     prisma.customer.count({ where: { ...filter, OR: [{ status: 'AT_RISK' }, { riskScore: { gte: 50 } }] } }),
     prisma.customer.count({ where: { ...filter, OR: [{ lastPurchaseDate: { lt: sixtyDaysAgo } }, { lastPurchaseDate: null }] } }),
     prisma.customer.count({ where: { ...filter, OR: [{ lastVisitDate: { lt: thirtyDaysAgo } }, { lastVisitDate: null }], status: 'ACTIVE' } }),
@@ -187,6 +190,7 @@ async function buildContext(userId: string, role: string): Promise<string> {
   return `DADOS ATUAIS (${scope}), data de hoje ${now.toLocaleDateString('pt-PT')}:
 - Clientes na carteira: ${totalCustomers}
 - Vendas este mês: €${(salesThisMonth._sum.total || 0).toFixed(2)}
+- Vendas mês passado: €${(salesLastMonth._sum.total || 0).toFixed(2)}
 - Clientes em risco/queda: ${atRisk}
 - Clientes inativos (60+ dias sem comprar): ${inactive}
 - Clientes a precisar de visita (30+ dias): ${toVisit}
