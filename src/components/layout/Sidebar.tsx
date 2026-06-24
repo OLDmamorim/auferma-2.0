@@ -16,7 +16,7 @@ const navItems = [
     group: 'Comercial',
     items: [
       { href: '/clientes', label: 'Clientes', icon: 'building' },
-      { href: '/pipeline', label: 'Propostas', icon: 'funnel' },
+      { href: '/pipeline', label: 'Orçamentos', icon: 'funnel' },
       { href: '/vendas', label: 'Vendas', icon: 'currency' },
       { href: '/tarefas', label: 'Tarefas', icon: 'check' },
       { href: '/visitas', label: 'Visitas', icon: 'map-pin' },

@@ -13,6 +13,7 @@ export async function GET() {
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
   const startOf12MonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1)
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
 
   const userId = (session.user as any).id
@@ -48,8 +49,8 @@ export async function GET() {
     // Customers count
     prisma.customer.count({ where: customerFilter }),
     prisma.customer.count({ where: { ...customerFilter, status: 'ACTIVE' } }),
-    prisma.customer.count({ where: { ...customerFilter, status: 'AT_RISK' } }),
-    prisma.customer.count({ where: { ...customerFilter, status: 'INACTIVE' } }),
+    prisma.customer.count({ where: { ...customerFilter, OR: [{ lastVisitDate: { lt: sixtyDaysAgo } }, { lastVisitDate: null }] } }),
+    prisma.customer.count({ where: { ...customerFilter, OR: [{ lastPurchaseDate: { lt: ninetyDaysAgo } }, { lastPurchaseDate: null }] } }),
     // Sales by brand (last 30 days)
     prisma.sale.groupBy({
       by: ['brandId'],

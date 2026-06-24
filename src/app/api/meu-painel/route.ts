@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const startOfMonth = new Date(year, month, 1)
   const startOfLastMonth = new Date(year, month - 1, 1)
   const endOfLastMonth = new Date(year, month, 0, 23, 59, 59, 999)
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
   const dayOfWeek = now.getDay()
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
   const startOfWeek = new Date(now)
@@ -45,9 +45,9 @@ export async function GET(req: NextRequest) {
       prisma.commercialTarget.findMany({ where: { year, month: month + 1 }, select: { target: true } }),
       prisma.customer.count({ where: { status: 'ACTIVE' } }),
       prisma.customer.findMany({
-        where: { OR: [{ lastPurchaseDate: { lt: thirtyDaysAgo } }, { riskScore: { gt: 60 } }] },
-        select: { id: true, name: true, lastPurchaseDate: true, riskScore: true, commercial: { select: { name: true } } },
-        orderBy: { riskScore: 'desc' },
+        where: { OR: [{ lastVisitDate: { lt: sixtyDaysAgo } }, { lastVisitDate: null }] },
+        select: { id: true, name: true, lastVisitDate: true, commercial: { select: { name: true } } },
+        orderBy: { lastVisitDate: 'asc' },
         take: 5,
       }),
       prisma.visit.count({ where: { date: { gte: startOfWeek, lte: endOfWeek } } }),
@@ -105,10 +105,10 @@ export async function GET(req: NextRequest) {
     }),
     prisma.customer.count({ where: { commercialId } }),
     prisma.customer.findMany({
-      where: { commercialId, OR: [{ lastPurchaseDate: { lt: thirtyDaysAgo } }, { riskScore: { gt: 60 } }] },
-      select: { id: true, name: true, lastPurchaseDate: true, riskScore: true },
+      where: { commercialId, OR: [{ lastVisitDate: { lt: sixtyDaysAgo } }, { lastVisitDate: null }] },
+      select: { id: true, name: true, lastVisitDate: true },
       take: 5,
-      orderBy: { riskScore: 'desc' },
+      orderBy: { lastVisitDate: 'asc' },
     }),
     prisma.task.findMany({
       where: { assignedToId: commercialId, status: { in: ['PENDING', 'IN_PROGRESS'] } },

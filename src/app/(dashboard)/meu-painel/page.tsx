@@ -16,8 +16,7 @@ interface MonthTarget {
 interface AtRiskCustomer {
   id: string
   name: string
-  lastPurchaseDate: string | null
-  riskScore: number
+  lastVisitDate: string | null
 }
 
 interface PendingTask {
@@ -314,23 +313,22 @@ export default function MeuPainelPage() {
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        {/* Clientes em Risco */}
+        {/* Sem Visitas */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">Clientes em Risco</h2>
-            <Link href="/clientes?status=AT_RISK" className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+            <h2 className="text-sm font-semibold text-gray-900">Sem Visitas</h2>
+            <Link href="/clientes" className="text-xs text-blue-600 hover:text-blue-800 font-medium">
               Ver todos →
             </Link>
           </div>
           {loading ? (
             <Skeleton className="h-48" />
           ) : data?.atRiskCustomers.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">Nenhum cliente em risco 🎉</p>
+            <p className="text-sm text-gray-400 text-center py-8">Todos os clientes foram visitados 🎉</p>
           ) : (
             <ul className="divide-y divide-gray-50">
               {data?.atRiskCustomers.map(c => {
-                const days = daysAgo(c.lastPurchaseDate)
-                const riskHigh = c.riskScore > 60
+                const days = daysAgo(c.lastVisitDate)
                 return (
                   <li key={c.id} className="py-3 flex items-center justify-between">
                     <div className="flex-1 min-w-0">
@@ -341,20 +339,17 @@ export default function MeuPainelPage() {
                         {c.name}
                       </Link>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {c.lastPurchaseDate
-                          ? `Última compra há ${days} dias (${formatDate(c.lastPurchaseDate)})`
-                          : 'Sem compras registadas'}
+                        {c.lastVisitDate
+                          ? `Última visita há ${days} dias (${formatDate(c.lastVisitDate)})`
+                          : 'Sem visitas registadas'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                      {riskHigh && (
-                        <span className="badge badge-red">Risco Alto</span>
+                      {!c.lastVisitDate && (
+                        <span className="badge badge-red">Nunca visitado</span>
                       )}
-                      {days > 30 && !riskHigh && (
-                        <span className="badge badge-orange">Inativo</span>
-                      )}
-                      {!riskHigh && days <= 30 && (
-                        <span className="badge badge-green">OK</span>
+                      {c.lastVisitDate && days > 60 && (
+                        <span className="badge badge-orange">{days}d sem visita</span>
                       )}
                     </div>
                   </li>

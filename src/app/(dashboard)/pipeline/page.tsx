@@ -25,7 +25,7 @@ const STAGES = [
   { key: 'LOST',     label: 'Perdida',  color: 'text-red-600',   bg: 'bg-red-50',   border: 'border-red-200',   icon: '❌' },
 ]
 
-export default function PropostasPage() {
+export default function OrcamentosPage() {
   const { data: session } = useSession()
   const [data, setData] = useState<{ proposals: Proposal[]; summary: Record<string, { count: number; value: number }> } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -50,7 +50,7 @@ export default function PropostasPage() {
   }
 
   async function deleteProposal(id: string) {
-    if (!confirm('Eliminar esta proposta?')) return
+    if (!confirm('Eliminar este orçamento?')) return
     await fetch(`/api/pipeline?id=${id}`, { method: 'DELETE' })
     fetchData()
   }
@@ -67,15 +67,15 @@ export default function PropostasPage() {
   return (
     <div className="p-4 md:p-6">
       <PageHeader
-        title="Propostas"
-        subtitle="Acompanhamento de propostas enviadas a clientes"
+        title="Orçamentos"
+        subtitle="Acompanhamento de orçamentos enviados a clientes"
         actions={
           <button
             onClick={() => { setEditProposal(null); setShowModal(true) }}
             className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Nova Proposta
+            Novo Orçamento
           </button>
         }
       />
@@ -205,10 +205,10 @@ export default function PropostasPage() {
         {!loading && proposals.length === 0 && (
           <div className="text-center py-16 text-gray-400">
             <p className="text-4xl mb-3">📄</p>
-            <p className="text-sm">Nenhuma proposta {filter !== 'ALL' ? STAGES.find(s => s.key === filter)?.label.toLowerCase() : 'criada'} ainda.</p>
+            <p className="text-sm">Nenhum orçamento {filter !== 'ALL' ? STAGES.find(s => s.key === filter)?.label.toLowerCase() : 'criado'} ainda.</p>
             {filter === 'ALL' && (
               <button onClick={() => setShowModal(true)} className="mt-4 text-sm text-blue-600 hover:underline">
-                Criar primeira proposta →
+                Criar primeiro orçamento →
               </button>
             )}
           </div>
@@ -257,7 +257,7 @@ function ProposalModal({ proposal, onClose, onSaved }: { proposal: Proposal | nu
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">{proposal ? 'Editar Proposta' : 'Nova Proposta'}</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{proposal ? 'Editar Orçamento' : 'Novo Orçamento'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
@@ -272,7 +272,7 @@ function ProposalModal({ proposal, onClose, onSaved }: { proposal: Proposal | nu
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Descrição da proposta *</label>
-            <input required className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Proposta Beko linha branca" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+            <input required className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Orçamento Beko linha branca" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -299,7 +299,7 @@ function ProposalModal({ proposal, onClose, onSaved }: { proposal: Proposal | nu
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50">Cancelar</button>
             <button type="submit" disabled={saving} className="flex-1 bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-60">
-              {saving ? 'A guardar...' : proposal ? 'Guardar' : 'Criar Proposta'}
+              {saving ? 'A guardar...' : proposal ? 'Guardar' : 'Criar Orçamento'}
             </button>
           </div>
         </form>
