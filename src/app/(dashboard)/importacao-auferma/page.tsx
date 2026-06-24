@@ -55,7 +55,7 @@ export default function ImportacaoAufermaPage() {
     e.preventDefault()
     setDragging(false)
     const f = e.dataTransfer.files[0]
-    if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) {
+    if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls') || f.name.endsWith('.xlsm'))) {
       setFile(f)
       setResult(null)
       setError(null)
@@ -116,16 +116,16 @@ export default function ImportacaoAufermaPage() {
       const col = (wanted: string): string | null => keyMap.get(normalize(wanted)) || null
 
       const K = {
-        mes: col('Mês'),
-        ano: col('Ficheiro'),
-        numCliente: col('Numero Cliente'),
-        nif: col('NIF'),
-        vendedor: col('Vendedor'),
-        cliente: col('Cliente'),
-        localidade: col('Localidade'),
-        class1: col('Classificação 1'),
-        valorLiquido: col('Valor Líquido'),
-        tipo: col('Tipo'),
+        data: col('Data'),
+        colabNome: col('Colab_Nome'),
+        cliId: col('Cli_Id'),
+        cliNome: col('Cli_Nome'),
+        cliContr: col('Cli_Contr'),
+        cliCodPostal: col('Cli_CodPostal'),
+        marca: col('Marca'),
+        familia: col('Familia'),
+        docId: col('Doc_Id'),
+        vendas: col('Vendas'),
       }
 
       const missing = Object.entries(K).filter(([, v]) => !v).map(([k]) => k)
@@ -135,16 +135,16 @@ export default function ImportacaoAufermaPage() {
 
       // ── 3. Map to compact payload ──────────────────────────────────────
       const rows = rawRows.map(r => ({
-        mes: r[K.mes!] != null ? String(r[K.mes!]).trim() : null,
-        ano: r[K.ano!] ? parseInt(String(r[K.ano!])) : null,
-        numCliente: r[K.numCliente!] ?? null,
-        nif: r[K.nif!] ?? null,
-        vendedor: r[K.vendedor!] ?? null,
-        cliente: r[K.cliente!] ?? null,
-        localidade: r[K.localidade!] ?? null,
-        class1: r[K.class1!] ?? null,
-        valorLiquido: parseFloat(String(r[K.valorLiquido!] ?? 0)) || 0,
-        tipo: r[K.tipo!] ?? null,
+        data: r[K.data!] != null ? Number(r[K.data!]) : null,
+        colabNome: r[K.colabNome!] ?? null,
+        cliId: r[K.cliId!] ?? null,
+        cliNome: r[K.cliNome!] ?? null,
+        cliContr: r[K.cliContr!] ?? null,
+        cliCodPostal: r[K.cliCodPostal!] ?? null,
+        marca: r[K.marca!] ?? null,
+        familia: r[K.familia!] ?? null,
+        docId: r[K.docId!] ?? null,
+        vendas: parseFloat(String(r[K.vendas!] ?? 0)) || 0,
       }))
 
       // ── 3. Send in chunks ──────────────────────────────────────────────
@@ -287,7 +287,7 @@ export default function ImportacaoAufermaPage() {
           dragging ? 'border-blue-500 bg-blue-50' : file ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
         }`}
       >
-        <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.xlsm" className="hidden" onChange={handleFileChange} />
         {file ? (
           <div>
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -306,7 +306,7 @@ export default function ImportacaoAufermaPage() {
               </svg>
             </div>
             <p className="font-medium text-gray-700">Arraste o ficheiro Excel aqui</p>
-            <p className="text-sm text-gray-400 mt-1">ou clique para selecionar · .xlsx / .xls</p>
+            <p className="text-sm text-gray-400 mt-1">ou clique para selecionar · .xlsx / .xlsm</p>
           </div>
         )}
       </div>
@@ -417,14 +417,15 @@ export default function ImportacaoAufermaPage() {
 
       {/* Mapping info */}
       <div className="mt-6 bg-gray-50 border border-gray-200 rounded-xl p-4">
-        <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Como é feito o mapeamento</h3>
+        <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Formato esperado (Ficheiro Mestre Auferma)</h3>
         <div className="space-y-1.5 text-xs text-gray-600">
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Vendedor →</span><span>Associado ao Comercial pelo nome (cria se a opção estiver ativa)</span></div>
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">NIF →</span><span>Identifica o cliente de forma única; cria se não existir</span></div>
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Classificação 1 →</span><span>Cria/associa a Marca automaticamente</span></div>
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Mês + Ficheiro →</span><span>Data da venda (dia 15 do mês)</span></div>
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Valor Líquido →</span><span>Total da venda (linhas de Desconto são ignoradas)</span></div>
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Localidade →</span><span>Zona do cliente (ex: "4435-321 RIO TINTO" → "RIO TINTO")</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Colab_Nome →</span><span>Comercial responsável (cria utilizador se a opção estiver ativa)</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Cli_Contr →</span><span>NIF do cliente — identificador único; cria se não existir</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Marca →</span><span>Marca do produto (cria automaticamente)</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Data →</span><span>Data da venda em formato serial Excel</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Vendas →</span><span>Valor da venda (Doc_Id=NCDsc e valores ≤0 são ignorados)</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Cli_CodPostal →</span><span>Zona do cliente (ex: "4435-321 RIO TINTO" → "RIO TINTO")</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Ignorado →</span><span>Marcas: DIVERSOS, TRANSPORTES, RENDAS, IMOBILIZADO, OUTROS</span></div>
         </div>
       </div>
     </div>
