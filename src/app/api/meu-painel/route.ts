@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       prisma.commercialTarget.findMany({ where: { year, month: month + 1 }, select: { target: true } }),
       prisma.customer.count({ where: { status: 'ACTIVE' } }),
       prisma.customer.findMany({
-        where: { OR: [{ lastVisitDate: { lt: sixtyDaysAgo } }, { lastVisitDate: null }] },
+        where: { lastVisitDate: { lt: sixtyDaysAgo } },
         select: { id: true, name: true, lastVisitDate: true, commercial: { select: { name: true } } },
         orderBy: { lastVisitDate: 'asc' },
         take: 5,
@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
     }),
     prisma.customer.count({ where: { commercialId } }),
     prisma.customer.findMany({
-      where: { commercialId, OR: [{ lastVisitDate: { lt: sixtyDaysAgo } }, { lastVisitDate: null }] },
+      where: { commercialId, lastVisitDate: { lt: sixtyDaysAgo } },
       select: { id: true, name: true, lastVisitDate: true },
       take: 5,
       orderBy: { lastVisitDate: 'asc' },

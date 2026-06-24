@@ -49,8 +49,8 @@ export async function GET() {
     // Customers count
     prisma.customer.count({ where: customerFilter }),
     prisma.customer.count({ where: { ...customerFilter, status: 'ACTIVE' } }),
-    prisma.customer.count({ where: { ...customerFilter, OR: [{ lastVisitDate: { lt: sixtyDaysAgo } }, { lastVisitDate: null }] } }),
-    prisma.customer.count({ where: { ...customerFilter, OR: [{ lastPurchaseDate: { lt: ninetyDaysAgo } }, { lastPurchaseDate: null }] } }),
+    prisma.customer.count({ where: { ...customerFilter, lastVisitDate: { lt: sixtyDaysAgo } } }),
+    prisma.customer.count({ where: { ...customerFilter, lastPurchaseDate: { lt: ninetyDaysAgo } } }),
     // Sales by brand (last 30 days)
     prisma.sale.groupBy({
       by: ['brandId'],
