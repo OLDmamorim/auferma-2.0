@@ -51,10 +51,10 @@ export async function GET() {
     prisma.customer.count({ where: { ...customerFilter, status: 'ACTIVE' } }),
     prisma.customer.count({ where: { ...customerFilter, lastVisitDate: { lt: sixtyDaysAgo } } }),
     prisma.customer.count({ where: { ...customerFilter, lastPurchaseDate: { lt: ninetyDaysAgo } } }),
-    // Sales by brand (last 30 days)
+    // Sales by family (last 30 days)
     prisma.sale.groupBy({
-      by: ['brandId'],
-      where: { date: { gte: thirtyDaysAgo }, customer: customerFilter },
+      by: ['family'],
+      where: { date: { gte: thirtyDaysAgo }, customer: customerFilter, family: { not: null } },
       _sum: { total: true },
       orderBy: { _sum: { total: 'desc' } },
       take: 6,
@@ -104,10 +104,7 @@ export async function GET() {
     }),
   ])
 
-  // Enrich brand sales with names
-  const brandIds = salesByBrand.map(s => s.brandId).filter(Boolean) as string[]
-  const brands = await prisma.brand.findMany({ where: { id: { in: brandIds } } })
-  const brandMap = Object.fromEntries(brands.map(b => [b.id, b.name]))
+  // family is stored as a plain string — no enrichment needed
 
   // Enrich commercial sales with names
   const commercialIds = (salesByCommercial as any[]).map(s => s.commercialId).filter(Boolean) as string[]
@@ -142,7 +139,7 @@ export async function GET() {
       recentVisits,
     },
     salesByBrand: salesByBrand.map(s => ({
-      name: brandMap[s.brandId!] || 'Sem marca',
+      name: (s as any).family || 'Sem família',
       total: s._sum.total || 0,
     })),
     salesByCommercial: (salesByCommercial as any[]).map(s => ({

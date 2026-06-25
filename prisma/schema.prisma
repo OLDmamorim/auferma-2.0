@@ -121,6 +121,7 @@ model Sale {
   customer     Customer   @relation(fields: [customerId], references: [id])
   brandId      String?
   brand        Brand?     @relation(fields: [brandId], references: [id])
+  family       String?
   commercialId String?
   date         DateTime
   total        Float
