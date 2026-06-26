@@ -4,3 +4,6 @@ node_modules/
 .env.local
 tsconfig.tsbuildinfo
 *.log
+
+# next.js generated
+next-env.d.ts
