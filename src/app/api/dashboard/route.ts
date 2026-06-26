@@ -3,6 +3,49 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+type Insight = { type: 'positive' | 'warning' | 'danger'; title: string; body: string }
+
+function generateDashboardInsights(d: {
+  monthChange: number
+  yoyChange: number | null
+  targetPct: number | null
+  atRiskPct: number
+  inactivePct: number
+  topFamily: { name: string; pct: number } | null
+  worstCustomer: { name: string; desvio: number | null } | null
+}): Insight[] {
+  const insights: Insight[] = []
+
+  if (d.yoyChange !== null) {
+    if (d.yoyChange > 10) insights.push({ type: 'positive', title: 'Crescimento face ao ano anterior', body: `Vendas acumuladas ${d.yoyChange.toFixed(0)}% acima do mesmo período do ano passado.` })
+    else if (d.yoyChange < -10) insights.push({ type: 'danger', title: 'Quebra face ao ano anterior', body: `Vendas acumuladas ${Math.abs(d.yoyChange).toFixed(0)}% abaixo do homólogo. Requer atenção imediata.` })
+    else if (d.yoyChange < 0) insights.push({ type: 'warning', title: 'Ligeira quebra homóloga', body: `Vendas ${Math.abs(d.yoyChange).toFixed(0)}% abaixo do ano anterior. Monitorizar evolução.` })
+  }
+
+  if (d.monthChange > 15) insights.push({ type: 'positive', title: 'Mês em aceleração', body: `Vendas do mês ${d.monthChange.toFixed(0)}% acima do mês anterior.` })
+  else if (d.monthChange < -15) insights.push({ type: 'warning', title: 'Mês em desaceleração', body: `Vendas do mês ${Math.abs(d.monthChange).toFixed(0)}% abaixo do mês anterior.` })
+
+  if (d.targetPct !== null) {
+    if (d.targetPct >= 100) insights.push({ type: 'positive', title: 'Orçamento do mês atingido', body: `Equipa já cumpriu ${d.targetPct.toFixed(0)}% do orçamento mensal.` })
+    else if (d.targetPct < 70) insights.push({ type: 'warning', title: 'Orçamento do mês em risco', body: `Apenas ${d.targetPct.toFixed(0)}% do orçamento mensal atingido até agora.` })
+  }
+
+  if (d.atRiskPct > 25) insights.push({ type: 'danger', title: 'Muitos clientes sem visita', body: `${d.atRiskPct.toFixed(0)}% da carteira está há mais de 60 dias sem visita. Priorizar contactos de retenção.` })
+  else if (d.atRiskPct > 12) insights.push({ type: 'warning', title: 'Clientes a monitorizar', body: `${d.atRiskPct.toFixed(0)}% dos clientes sem visita recente. Agendar visitas preventivas.` })
+
+  if (d.inactivePct > 30) insights.push({ type: 'danger', title: 'Carteira inativa elevada', body: `${d.inactivePct.toFixed(0)}% dos clientes sem comprar há mais de 90 dias.` })
+
+  if (d.topFamily && d.topFamily.pct > 50) insights.push({ type: 'warning', title: 'Concentração de família', body: `A família "${d.topFamily.name}" representa ${d.topFamily.pct.toFixed(0)}% das vendas recentes. Diversificar reduz risco.` })
+
+  if (d.worstCustomer && d.worstCustomer.desvio !== null && d.worstCustomer.desvio < -25) {
+    insights.push({ type: 'warning', title: 'Cliente em forte queda', body: `${d.worstCustomer.name} está ${Math.abs(d.worstCustomer.desvio).toFixed(0)}% abaixo do ano anterior. Agendar visita.` })
+  }
+
+  if (insights.length === 0) insights.push({ type: 'positive', title: 'Indicadores estáveis', body: 'A atividade da equipa está dentro dos parâmetros normais. Manter o ritmo e foco nos clientes de maior potencial.' })
+
+  return insights.slice(0, 6)
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -173,7 +216,38 @@ export async function GET() {
     }
   })
 
+  // ── Team AI analysis ───────────────────────────────────────────────────────
+  const currentMonthIdx = now.getMonth() // 0-based; months elapsed so far
+  let yoyThis = 0
+  let yoyLast = 0
+  for (let i = 0; i <= currentMonthIdx; i++) {
+    yoyThis += monthlySeries[i].total
+    yoyLast += monthlySeries[i].homologo
+  }
+  const yoyChange = yoyLast > 0 ? ((yoyThis - yoyLast) / yoyLast) * 100 : null
+
+  const thisMonthBudget = targetMap.get(currentMonthIdx + 1) || 0
+  const targetPct = thisMonthBudget > 0 ? (thisMonthTotal / thisMonthBudget) * 100 : null
+
+  const atRiskPct = totalCustomers > 0 ? (atRiskCustomers / totalCustomers) * 100 : 0
+  const inactivePct = totalCustomers > 0 ? (inactiveCustomers / totalCustomers) * 100 : 0
+
+  const familyTotal = salesByBrand.reduce((s, b) => s + (b._sum.total || 0), 0)
+  const topFamilyRow = salesByBrand[0]
+  const topFamily = topFamilyRow && familyTotal > 0
+    ? { name: (topFamilyRow as any).family || 'Sem família', pct: ((topFamilyRow._sum.total || 0) / familyTotal) * 100 }
+    : null
+
+  const worstCustomer = topCustomersSorted.length > 0
+    ? { name: topCustomersSorted[0].name, desvio: topCustomersSorted[0].desvio }
+    : null
+
+  const aiInsights = generateDashboardInsights({
+    monthChange, yoyChange, targetPct, atRiskPct, inactivePct, topFamily, worstCustomer,
+  })
+
   return NextResponse.json({
+    aiInsights,
     kpis: {
       totalSalesMonth: thisMonthTotal,
       totalSalesLastMonth: lastMonthTotal,

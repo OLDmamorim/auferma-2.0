@@ -12,7 +12,10 @@ import Link from 'next/link'
 
 const COLORS = ['#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777', '#0891b2']
 
+interface Insight { type: 'positive' | 'warning' | 'danger'; title: string; body: string }
+
 interface DashboardData {
+  aiInsights?: Insight[]
   kpis: {
     totalSalesMonth: number
     totalSalesLastMonth: number
@@ -106,6 +109,42 @@ export default function DashboardPage() {
               icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>}
             />
           </>
+        )}
+      </div>
+
+      {/* AI Analysis */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 bg-purple-100 rounded-lg flex items-center justify-center">
+            <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 001.5 2.121m-1.5-2.121c.251.023.501.05.75.082M15 14.5l-4.091 4.091M15 14.5l.659 1.591a2.25 2.25 0 01-1.591 3.182L5 21" />
+            </svg>
+          </div>
+          <h2 className="text-sm font-semibold text-gray-900">Análise IA</h2>
+          <span className="text-xs text-gray-400 ml-auto">Gerado automaticamente com base nos dados reais</span>
+        </div>
+        {loading ? (
+          <Skeleton className="h-24" />
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">
+            {(data?.aiInsights || []).map((ins, i) => (
+              <div key={i} className={`flex gap-3 p-4 rounded-xl border-l-4 ${
+                ins.type === 'positive' ? 'bg-green-50 border-green-400' :
+                ins.type === 'warning' ? 'bg-amber-50 border-amber-400' :
+                'bg-red-50 border-red-400'
+              }`}>
+                <div className={`text-lg ${ins.type === 'positive' ? 'text-green-500' : ins.type === 'warning' ? 'text-amber-500' : 'text-red-500'}`}>
+                  {ins.type === 'positive' ? '↑' : ins.type === 'warning' ? '⚠' : '⚡'}
+                </div>
+                <div>
+                  <p className={`text-xs font-semibold mb-1 ${ins.type === 'positive' ? 'text-green-700' : ins.type === 'warning' ? 'text-amber-700' : 'text-red-700'}`}>
+                    {ins.title}
+                  </p>
+                  <p className="text-xs text-gray-600 leading-relaxed">{ins.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
