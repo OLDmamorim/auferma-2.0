@@ -11,14 +11,18 @@ export async function GET(req: NextRequest) {
   const role = (session.user as any).role as string
   const where = role === 'COMMERCIAL' ? { commercialId: userId } : {}
 
-  const proposals = await prisma.proposal.findMany({
+  const rows = await prisma.proposal.findMany({
     where,
-    include: {
+    select: {
+      id: true, title: true, value: true, stage: true, expectedDate: true,
+      notes: true, closedAt: true, createdAt: true, attachmentName: true,
       customer: { select: { id: true, name: true, zone: true } },
       commercial: { select: { id: true, name: true } },
     },
     orderBy: { updatedAt: 'desc' },
   })
+  // expose whether an attachment exists without sending the base64 payload
+  const proposals = rows.map(p => ({ ...p, hasAttachment: !!p.attachmentName }))
 
   const stages = ['SENT', 'ACCEPTED', 'LOST'] as const
   const summary = stages.reduce((acc, stage) => {
@@ -46,8 +50,11 @@ export async function POST(req: NextRequest) {
       stage: body.stage || 'SENT',
       expectedDate: body.expectedDate ? new Date(body.expectedDate) : null,
       notes: body.notes || null,
+      attachmentName: body.attachmentName || null,
+      attachmentType: body.attachmentType || null,
+      attachmentData: body.attachmentData || null,
     },
-    include: { customer: { select: { id: true, name: true } } },
+    select: { id: true, customer: { select: { id: true, name: true } } },
   })
 
   return NextResponse.json(proposal)

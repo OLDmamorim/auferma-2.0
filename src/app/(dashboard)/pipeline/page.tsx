@@ -15,6 +15,8 @@ interface Proposal {
   customer: { id: string; name: string; zone: string | null }
   commercial: { id: string; name: string } | null
   createdAt: string
+  attachmentName: string | null
+  hasAttachment?: boolean
 }
 
 interface Customer { id: string; name: string }
@@ -156,6 +158,14 @@ export default function OrcamentosPage() {
                     {p.notes && (
                       <span className="text-xs text-gray-500 italic truncate max-w-xs">{p.notes}</span>
                     )}
+                    {p.attachmentName && (
+                      <a
+                        href={`/api/pipeline/attachment?id=${p.id}`}
+                        className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
+                      >
+                        📎 {p.attachmentName}
+                      </a>
+                    )}
                   </div>
                 </div>
 
@@ -237,18 +247,44 @@ function ProposalModal({ proposal, onClose, onSaved }: { proposal: Proposal | nu
   })
   const [saving, setSaving] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [attachment, setAttachment] = useState<{ name: string; type: string; data: string } | null>(null)
+  const [fileError, setFileError] = useState('')
 
   useEffect(() => {
     fetch('/api/customers?limit=200').then(r => r.json()).then(d => setCustomers(d.customers || []))
   }, [])
 
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    setFileError('')
+    const file = e.target.files?.[0]
+    if (!file) { setAttachment(null); return }
+    if (file.size > 5 * 1024 * 1024) {
+      setFileError('Ficheiro demasiado grande (máx. 5 MB)')
+      e.target.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      const base64 = result.split(',')[1] || ''
+      setAttachment({ name: file.name, type: file.type || 'application/octet-stream', data: base64 })
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
+    const payload: any = proposal ? { id: proposal.id, ...form } : { ...form }
+    if (attachment) {
+      payload.attachmentName = attachment.name
+      payload.attachmentType = attachment.type
+      payload.attachmentData = attachment.data
+    }
     await fetch('/api/pipeline', {
       method: proposal ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(proposal ? { id: proposal.id, ...form } : form),
+      body: JSON.stringify(payload),
     })
     onSaved()
   }
@@ -295,6 +331,19 @@ function ProposalModal({ proposal, onClose, onSaved }: { proposal: Proposal | nu
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Notas</label>
             <textarea rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Anexar ficheiro Excel</label>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              onChange={handleFile}
+              className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+            {fileError && <p className="text-xs text-red-500 mt-1">{fileError}</p>}
+            {!attachment && proposal?.attachmentName && (
+              <p className="text-xs text-gray-500 mt-1">Anexo atual: 📎 {proposal.attachmentName}</p>
+            )}
           </div>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50">Cancelar</button>

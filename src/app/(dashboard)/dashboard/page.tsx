@@ -26,8 +26,8 @@ interface DashboardData {
   }
   salesByBrand: { name: string; total: number }[]
   salesByCommercial: { name: string; total: number }[]
-  monthlySales: { month: string; total: number }[]
-  topCustomers: { id: string; name: string; zone: string | null; total: number }[]
+  monthlySales: { month: string; total: number; homologo: number; orcamento: number }[]
+  topCustomers: { id: string; name: string; zone: string | null; commercial: string | null; total: number; lastYear: number; desvio: number | null }[]
 }
 
 function Skeleton({ className }: { className?: string }) {
@@ -113,7 +113,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {/* Monthly Sales Chart */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Evolução de Vendas (12 meses)</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Evolução de Vendas vs Ano Anterior e Orçamento</h2>
           {loading ? <Skeleton className="h-56" /> : (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={data?.monthlySales || []}>
@@ -121,7 +121,10 @@ export default function DashboardPage() {
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `€${(v/1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: number) => formatCurrency(v)} labelStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="total" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" name="Este ano" dataKey="total" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Line type="monotone" name="Ano anterior" dataKey="homologo" stroke="#dc2626" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                <Line type="monotone" name="Orçamento" dataKey="orcamento" stroke="#16a34a" strokeWidth={2} dot={false} strokeDasharray="6 3" />
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -129,7 +132,7 @@ export default function DashboardPage() {
 
         {/* Sales by Brand */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Marca (30 dias)</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Família (30 dias)</h2>
           {loading ? <Skeleton className="h-56" /> : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data?.salesByBrand || []} layout="vertical">
@@ -153,7 +156,7 @@ export default function DashboardPage() {
         {/* Top Customers */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">Top Clientes (12 meses)</h2>
+            <h2 className="text-sm font-semibold text-gray-900">Clientes por Desvio vs Ano Anterior</h2>
             <Link href="/clientes" className="text-xs text-blue-600 hover:text-blue-800 font-medium">Ver todos →</Link>
           </div>
           {loading ? <Skeleton className="h-48" /> : (
@@ -162,8 +165,8 @@ export default function DashboardPage() {
                 <tr>
                   <th>#</th>
                   <th>Cliente</th>
-                  <th>Zona</th>
-                  <th className="text-right">Total</th>
+                  <th>Vendedor</th>
+                  <th className="text-right">Desvio</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,8 +178,13 @@ export default function DashboardPage() {
                         {c.name}
                       </Link>
                     </td>
-                    <td className="text-gray-500">{c.zone || '—'}</td>
-                    <td className="text-right font-semibold text-gray-900">{formatCurrency(c.total)}</td>
+                    <td className="text-gray-500">{c.commercial || '—'}</td>
+                    <td className={`text-right font-semibold ${
+                      c.desvio === null ? 'text-gray-400'
+                        : c.desvio >= 0 ? 'text-green-600' : 'text-red-500'
+                    }`}>
+                      {c.desvio === null ? '—' : `${c.desvio >= 0 ? '+' : ''}${c.desvio.toFixed(1)}%`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

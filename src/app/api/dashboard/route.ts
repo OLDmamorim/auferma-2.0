@@ -8,10 +8,11 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const now = new Date()
+  const currentYear = now.getFullYear()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
-  const startOf12MonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+  const startOfLastYear = new Date(currentYear - 1, 0, 1)
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
@@ -32,6 +33,7 @@ export async function GET() {
     salesByBrand,
     salesByCommercial,
     monthlySales,
+    monthlyTargets,
     pendingTasks,
     recentVisits,
     topCustomers,
@@ -66,17 +68,23 @@ export async function GET() {
       _sum: { total: true },
       orderBy: { _sum: { total: 'desc' } },
     }) : Promise.resolve([]),
-    // Monthly sales (last 12 months)
+    // Monthly sales: current year + homologous (last year), by calendar month
     prisma.$queryRaw`
       SELECT
         EXTRACT(YEAR FROM date)::int as year,
         EXTRACT(MONTH FROM date)::int as month,
         SUM(total)::float as total
       FROM "Sale"
-      WHERE date >= ${startOf12MonthsAgo}
+      WHERE date >= ${startOfLastYear}
       GROUP BY year, month
       ORDER BY year, month
     `,
+    // Monthly budget (target) for the current year, summed across commercials
+    prisma.commercialTarget.groupBy({
+      by: ['month'],
+      where: { year: currentYear },
+      _sum: { target: true },
+    }),
     // Pending tasks
     prisma.task.count({
       where: {
@@ -91,16 +99,19 @@ export async function GET() {
         ...(role === 'COMMERCIAL' ? { commercialId: userId } : {})
       }
     }),
-    // Top customers by sales
+    // Top customers — sales of current + last year for deviation %
     prisma.customer.findMany({
       where: customerFilter,
-      include: {
+      select: {
+        id: true,
+        name: true,
+        zone: true,
+        commercial: { select: { name: true } },
         sales: {
-          where: { date: { gte: startOf12MonthsAgo } },
-          select: { total: true },
+          where: { date: { gte: startOfLastYear } },
+          select: { total: true, date: true },
         },
       },
-      take: 10,
     }),
   ])
 
@@ -115,16 +126,52 @@ export async function GET() {
   const lastMonthTotal = totalSalesLastMonth._sum.total || 0
   const monthChange = lastMonthTotal > 0 ? ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 : 0
 
-  // Process top customers
+  // Process top customers — deviation of this year vs homologous (last year)
   const topCustomersSorted = topCustomers
-    .map(c => ({
-      id: c.id,
-      name: c.name,
-      zone: c.zone,
-      total: c.sales.reduce((sum, s) => sum + s.total, 0),
-    }))
-    .sort((a, b) => b.total - a.total)
+    .map(c => {
+      let thisYear = 0
+      let lastYear = 0
+      for (const s of c.sales) {
+        const y = new Date(s.date).getFullYear()
+        if (y === currentYear) thisYear += s.total
+        else if (y === currentYear - 1) lastYear += s.total
+      }
+      const desvio = lastYear > 0 ? ((thisYear - lastYear) / lastYear) * 100 : null
+      return {
+        id: c.id,
+        name: c.name,
+        zone: c.zone,
+        commercial: c.commercial?.name || null,
+        total: thisYear,
+        lastYear,
+        desvio,
+      }
+    })
+    // only customers with activity in either year
+    .filter(c => c.total > 0 || c.lastYear > 0)
+    // worst deviation first (biggest drops at top)
+    .sort((a, b) => {
+      if (a.desvio === null) return 1
+      if (b.desvio === null) return -1
+      return a.desvio - b.desvio
+    })
     .slice(0, 10)
+
+  // Build 12-month series for the current year with homologous + budget
+  const salesMap = new Map<string, number>()
+  for (const r of monthlySales as any[]) salesMap.set(`${r.year}-${r.month}`, r.total)
+  const targetMap = new Map<number, number>()
+  for (const t of monthlyTargets as any[]) targetMap.set(t.month, t._sum.target || 0)
+  const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+  const monthlySeries = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1
+    return {
+      month: MONTH_NAMES[i],
+      total: salesMap.get(`${currentYear}-${m}`) || 0,
+      homologo: salesMap.get(`${currentYear - 1}-${m}`) || 0,
+      orcamento: targetMap.get(m) || 0,
+    }
+  })
 
   return NextResponse.json({
     kpis: {
@@ -146,10 +193,7 @@ export async function GET() {
       name: commercialMap[s.commercialId!] || 'N/A',
       total: s._sum.total || 0,
     })),
-    monthlySales: (monthlySales as any[]).map(r => ({
-      month: `${r.month}/${r.year}`,
-      total: r.total,
-    })),
+    monthlySales: monthlySeries,
     topCustomers: topCustomersSorted,
   })
 }

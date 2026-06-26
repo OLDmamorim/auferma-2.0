@@ -237,6 +237,9 @@ model Proposal {
   expectedDate DateTime?
   notes        String?
   closedAt     DateTime?
+  attachmentName String?
+  attachmentType String?
+  attachmentData String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
