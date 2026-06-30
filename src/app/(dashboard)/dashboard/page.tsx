@@ -27,7 +27,7 @@ interface DashboardData {
     pendingTasks: number
     recentVisits: number
   }
-  salesByBrand: { name: string; total: number }[]
+  salesByBrand: { name: string; total: number; units: number }[]
   salesByCommercial: { name: string; total: number }[]
   monthlySales: { month: string; total: number; homologo: number; orcamento: number }[]
   topCustomers: { id: string; name: string; zone: string | null; commercial: string | null; total: number; lastYear: number; desvio: number | null }[]
@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [familyMetric, setFamilyMetric] = useState<'valor' | 'unidades'>('valor')
   const role = (session?.user as any)?.role
 
   useEffect(() => {
@@ -169,17 +170,33 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Sales by Brand */}
+        {/* Sales by Family */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Família (este ano)</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Vendas por Família (este ano)</h2>
+            <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setFamilyMetric('valor')}
+                className={`px-3 py-1 text-xs font-medium transition ${familyMetric === 'valor' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >€</button>
+              <button
+                onClick={() => setFamilyMetric('unidades')}
+                className={`px-3 py-1 text-xs font-medium transition ${familyMetric === 'unidades' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >Unidades</button>
+            </div>
+          </div>
           {loading ? <Skeleton className="h-56" /> : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data?.salesByBrand || []} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => `€${(v/1000).toFixed(0)}k`} />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={v => familyMetric === 'valor' ? `€${(v/1000).toFixed(0)}k` : `${v}`}
+                />
                 <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                <Bar dataKey="total" fill="#2563eb" radius={[0, 4, 4, 0]}>
+                <Tooltip formatter={(v: number) => familyMetric === 'valor' ? formatCurrency(v) : `${v.toLocaleString('pt-PT')} un.`} />
+                <Bar dataKey={familyMetric === 'valor' ? 'total' : 'units'} radius={[0, 4, 4, 0]}>
                   {(data?.salesByBrand || []).map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}

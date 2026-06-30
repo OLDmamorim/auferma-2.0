@@ -133,6 +133,9 @@ export default function ImportacaoAufermaPage() {
         throw new Error(`Colunas não encontradas: ${missing.join(', ')}. Colunas no ficheiro: ${actualKeys.join(' | ')}`)
       }
 
+      // Quantity is optional (SomaDeQuant) — not all files include it
+      const quantKey = col('SomaDeQuant') || col('SomaDeQuantidade') || col('Quantidade')
+
       // ── 3. Map to compact payload ──────────────────────────────────────
       const rows = rawRows.map(r => ({
         data: r[K.data!] != null ? Number(r[K.data!]) : null,
@@ -145,6 +148,7 @@ export default function ImportacaoAufermaPage() {
         familia: r[K.familia!] ?? null,
         docId: r[K.docId!] ?? null,
         vendas: parseFloat(String(r[K.vendas!] ?? 0)) || 0,
+        quantidade: quantKey ? (parseFloat(String(r[quantKey] ?? 0)) || 0) : 0,
       }))
 
       // ── 3. Send in chunks ──────────────────────────────────────────────

@@ -125,6 +125,7 @@ model Sale {
   commercialId String?
   date         DateTime
   total        Float
+  quantity     Float      @default(0)
   margin       Float?
   items        SaleItem[]
   createdAt    DateTime   @default(now())

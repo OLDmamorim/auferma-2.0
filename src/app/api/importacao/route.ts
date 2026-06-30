@@ -51,6 +51,7 @@ interface ImportRow {
   familia: string | null
   docId: string | null       // NCDsc = credit note/discount, CliFa = invoice
   vendas: number             // sale value
+  quantidade?: number        // units (SomaDeQuant)
 }
 
 export async function POST(req: NextRequest) {
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
     family: string | null
     date: Date
     total: number
+    quantity: number
     customerName: string
     address: string | null
     zone: string | null
@@ -164,6 +166,7 @@ export async function POST(req: NextRequest) {
       family,
       date,
       total,
+      quantity: Number(row.quantidade) || 0,
       customerName: row.cliNome ? String(row.cliNome).trim() : `Cliente ${cliId}`,
       address: codPostal,
       zone,
@@ -227,7 +230,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Build and insert sales ─────────────────────────────────────────────────
-  const salesData: { customerId: string; commercialId: string | null; brandId: string | null; family: string | null; date: Date; total: number }[] = []
+  const salesData: { customerId: string; commercialId: string | null; brandId: string | null; family: string | null; date: Date; total: number; quantity: number }[] = []
   let errors = 0
   const errorLog: string[] = []
 
@@ -240,7 +243,7 @@ export async function POST(req: NextRequest) {
     }
     const commercialId = r.commercialNorm ? (userMap.get(r.commercialNorm.toLowerCase()) || null) : null
     const brandId = r.brandName ? (brandCache.get(r.brandName.toLowerCase()) || null) : null
-    salesData.push({ customerId: cached.id, commercialId, brandId, family: r.family, date: r.date, total: r.total })
+    salesData.push({ customerId: cached.id, commercialId, brandId, family: r.family, date: r.date, total: r.total, quantity: r.quantity })
   }
 
   if (salesData.length > 0) {

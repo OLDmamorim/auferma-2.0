@@ -102,7 +102,7 @@ export async function GET() {
     prisma.sale.groupBy({
       by: ['family'],
       where: { date: { gte: startOfThisYear }, customer: customerFilter, family: { not: null } },
-      _sum: { total: true },
+      _sum: { total: true, quantity: true },
       orderBy: { _sum: { total: 'desc' } },
       take: 6,
     }),
@@ -110,7 +110,7 @@ export async function GET() {
     prisma.sale.groupBy({
       by: ['brandId'],
       where: { date: { gte: startOfThisYear }, customer: customerFilter, brandId: { not: null } },
-      _sum: { total: true },
+      _sum: { total: true, quantity: true },
       orderBy: { _sum: { total: 'desc' } },
       take: 6,
     }),
@@ -169,9 +169,10 @@ export async function GET() {
   ])
 
   // Sales by family — fall back to brand names when no family data is stored yet
-  let salesByCategory: { name: string; total: number }[] = salesByBrand.map(s => ({
+  let salesByCategory: { name: string; total: number; units: number }[] = salesByBrand.map(s => ({
     name: (s as any).family || 'Sem família',
     total: s._sum.total || 0,
+    units: s._sum.quantity || 0,
   }))
   if (salesByCategory.length === 0 && salesByBrandFallback.length > 0) {
     const bIds = salesByBrandFallback.map(s => s.brandId).filter(Boolean) as string[]
@@ -180,6 +181,7 @@ export async function GET() {
     salesByCategory = salesByBrandFallback.map(s => ({
       name: bMap[s.brandId!] || 'Sem marca',
       total: s._sum.total || 0,
+      units: s._sum.quantity || 0,
     }))
   }
 
