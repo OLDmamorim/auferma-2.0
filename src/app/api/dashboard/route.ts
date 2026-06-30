@@ -56,6 +56,7 @@ export async function GET() {
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
   const startOfLastYear = new Date(currentYear - 1, 0, 1)
+  const startOfThisYear = new Date(currentYear, 0, 1)
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
@@ -74,6 +75,7 @@ export async function GET() {
     atRiskCustomers,
     inactiveCustomers,
     salesByBrand,
+    salesByBrandFallback,
     salesByCommercial,
     monthlySales,
     monthlyTargets,
@@ -96,10 +98,18 @@ export async function GET() {
     prisma.customer.count({ where: { ...customerFilter, status: 'ACTIVE' } }),
     prisma.customer.count({ where: { ...customerFilter, lastVisitDate: { lt: sixtyDaysAgo } } }),
     prisma.customer.count({ where: { ...customerFilter, lastPurchaseDate: { lt: ninetyDaysAgo } } }),
-    // Sales by family (last 30 days)
+    // Sales by family (current year)
     prisma.sale.groupBy({
       by: ['family'],
-      where: { date: { gte: thirtyDaysAgo }, customer: customerFilter, family: { not: null } },
+      where: { date: { gte: startOfThisYear }, customer: customerFilter, family: { not: null } },
+      _sum: { total: true },
+      orderBy: { _sum: { total: 'desc' } },
+      take: 6,
+    }),
+    // Fallback: sales by brand (current year) — used when no family data exists
+    prisma.sale.groupBy({
+      by: ['brandId'],
+      where: { date: { gte: startOfThisYear }, customer: customerFilter, brandId: { not: null } },
       _sum: { total: true },
       orderBy: { _sum: { total: 'desc' } },
       take: 6,
@@ -158,7 +168,20 @@ export async function GET() {
     }),
   ])
 
-  // family is stored as a plain string — no enrichment needed
+  // Sales by family — fall back to brand names when no family data is stored yet
+  let salesByCategory: { name: string; total: number }[] = salesByBrand.map(s => ({
+    name: (s as any).family || 'Sem família',
+    total: s._sum.total || 0,
+  }))
+  if (salesByCategory.length === 0 && salesByBrandFallback.length > 0) {
+    const bIds = salesByBrandFallback.map(s => s.brandId).filter(Boolean) as string[]
+    const bRows = await prisma.brand.findMany({ where: { id: { in: bIds } }, select: { id: true, name: true } })
+    const bMap = Object.fromEntries(bRows.map(b => [b.id, b.name]))
+    salesByCategory = salesByBrandFallback.map(s => ({
+      name: bMap[s.brandId!] || 'Sem marca',
+      total: s._sum.total || 0,
+    }))
+  }
 
   // Enrich commercial sales with names
   const commercialIds = (salesByCommercial as any[]).map(s => s.commercialId).filter(Boolean) as string[]
@@ -232,10 +255,9 @@ export async function GET() {
   const atRiskPct = totalCustomers > 0 ? (atRiskCustomers / totalCustomers) * 100 : 0
   const inactivePct = totalCustomers > 0 ? (inactiveCustomers / totalCustomers) * 100 : 0
 
-  const familyTotal = salesByBrand.reduce((s, b) => s + (b._sum.total || 0), 0)
-  const topFamilyRow = salesByBrand[0]
-  const topFamily = topFamilyRow && familyTotal > 0
-    ? { name: (topFamilyRow as any).family || 'Sem família', pct: ((topFamilyRow._sum.total || 0) / familyTotal) * 100 }
+  const familyTotal = salesByCategory.reduce((s, b) => s + b.total, 0)
+  const topFamily = salesByCategory[0] && familyTotal > 0
+    ? { name: salesByCategory[0].name, pct: (salesByCategory[0].total / familyTotal) * 100 }
     : null
 
   const worstCustomer = topCustomersSorted.length > 0
@@ -259,10 +281,7 @@ export async function GET() {
       pendingTasks,
       recentVisits,
     },
-    salesByBrand: salesByBrand.map(s => ({
-      name: (s as any).family || 'Sem família',
-      total: s._sum.total || 0,
-    })),
+    salesByBrand: salesByCategory,
     salesByCommercial: (salesByCommercial as any[]).map(s => ({
       name: commercialMap[s.commercialId!] || 'N/A',
       total: s._sum.total || 0,

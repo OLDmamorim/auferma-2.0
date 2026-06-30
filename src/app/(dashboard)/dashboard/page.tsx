@@ -171,7 +171,7 @@ export default function DashboardPage() {
 
         {/* Sales by Brand */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Família (30 dias)</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Família (este ano)</h2>
           {loading ? <Skeleton className="h-56" /> : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data?.salesByBrand || []} layout="vertical">
