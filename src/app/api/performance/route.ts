@@ -97,35 +97,6 @@ export async function GET(req: NextRequest) {
   const tasksMap = new Map(tasksAgg.map(t => [t.assignedToId!, t._count.id]))
   const newCustomersMap = new Map(newCustomersAgg.map(c => [c.commercialId!, c._count.id]))
 
-  const data = commercials.map(c => {
-    const s = salesMap.get(c.id)
-    const sales = s?.total || 0
-    const salesCount = s?.count || 0
-    const visits = visitsMap.get(c.id) || 0
-    const tasksDone = tasksMap.get(c.id) || 0
-    const newCustomers = newCustomersMap.get(c.id) || 0
-    const avgOrderValue = salesCount > 0 ? sales / salesCount : 0
-    const target = targetsMap.get(c.id)
-    const targetPct = period === 'month' && target ? Math.round((sales / target) * 100) : null
-
-    return {
-      userId: c.id,
-      name: c.name,
-      sales,
-      salesCount,
-      visits,
-      tasksDone,
-      newCustomers,
-      avgOrderValue,
-      targetPct,
-    }
-  })
-
-  // Rankings
-  const bySales = [...data].sort((a, b) => b.sales - a.sales)
-  const byVisits = [...data].sort((a, b) => b.visits - a.visits)
-  const byTasksDone = [...data].sort((a, b) => b.tasksDone - a.tasksDone)
-
   // Monthly evolution (last 6 months) via raw query
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
 
@@ -144,20 +115,36 @@ export async function GET(req: NextRequest) {
     ORDER BY year ASC, month ASC
   `
 
-  const monthlyEvolution = commercials.map(c => {
-    const rows = evolutionRows.filter(r => r.commercialId === c.id)
+  const data = commercials.map(c => {
+    const s = salesMap.get(c.id)
+    const sales = s?.total || 0
+    const salesCount = s?.count || 0
+    const visits = visitsMap.get(c.id) || 0
+    const tasksDone = tasksMap.get(c.id) || 0
+    const newCustomers = newCustomersMap.get(c.id) || 0
+    const avgOrderValue = salesCount > 0 ? sales / salesCount : 0
+    const target = targetsMap.get(c.id)
+    const targetPct = period === 'month' && target ? Math.round((sales / target) * 100) : null
+    const monthlyTotals = evolutionRows
+      .filter(r => r.commercialId === c.id)
+      .map(r => ({ month: r.month, year: r.year, total: r.total }))
+
     return {
-      userId: c.id,
+      id: c.id,
       name: c.name,
-      months: rows.map(r => ({ month: r.month, year: r.year, total: r.total })),
+      sales,
+      salesCount,
+      visits,
+      tasksDone,
+      newCustomers,
+      avgOrderValue,
+      targetPct,
+      monthlyTotals,
     }
   })
 
   return NextResponse.json({
-    bySales,
-    byVisits,
-    byTasksDone,
-    monthlyEvolution,
+    commercials: data,
     period,
     year,
     month,
