@@ -462,9 +462,9 @@ export default function ImportacaoAufermaPage() {
           <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Cli_Contr →</span><span>NIF do cliente — identificador único; cria se não existir</span></div>
           <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Marca →</span><span>Marca do produto (cria automaticamente)</span></div>
           <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Data →</span><span>Data da venda em formato serial Excel</span></div>
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Vendas →</span><span>Valor da venda (Doc_Id=NCDsc e valores ≤0 são ignorados)</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Vendas →</span><span>Valor da venda (líquido — notas de crédito e devoluções são abatidas)</span></div>
           <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Cli_CodPostal →</span><span>Zona do cliente (ex: "4435-321 RIO TINTO" → "RIO TINTO")</span></div>
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Ignorado →</span><span>Apenas notas de crédito (Doc_Id=NCDsc) e valores ≤0. Todas as marcas/famílias são importadas.</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Ignorado →</span><span>Apenas linhas de valor zero. Todas as vendas, notas de crédito e devoluções são importadas (total líquido = soma da coluna Vendas).</span></div>
         </div>
       </div>
     </div>

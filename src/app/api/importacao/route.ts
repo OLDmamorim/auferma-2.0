@@ -117,11 +117,11 @@ export async function POST(req: NextRequest) {
   const validRows: ValidRow[] = []
 
   for (const row of rows) {
-    // Skip credit notes / discounts
-    if (row.docId === 'NCDsc') { skip('desconto'); continue }
-
+    // Import every line — including credit notes (NCDsc) and negative values —
+    // so totals match the raw Excel column (net sales). Credit notes carry their
+    // commercial, so they are automatically deducted from that commercial's total.
     const total = Number(row.vendas) || 0
-    if (total <= 0) { skip('valor_zero'); continue }
+    if (total === 0) { skip('valor_zero'); continue }
 
     const nif = row.cliContr ? String(row.cliContr).trim() : null
     const cliId = row.cliId ? String(row.cliId).trim() : null
