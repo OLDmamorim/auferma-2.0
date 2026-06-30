@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [familyMetric, setFamilyMetric] = useState<'valor' | 'unidades'>('valor')
+  const [familyMetric, setFamilyMetric] = useState<'valor' | 'unidades'>('unidades')
   const role = (session?.user as any)?.role
 
   useEffect(() => {
@@ -196,7 +196,12 @@ export default function DashboardPage() {
           </div>
           {loading ? <Skeleton className="h-56" /> : (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={data?.salesByBrand || []} layout="vertical">
+              <BarChart
+                data={[...(data?.salesByBrand || [])].sort((a, b) =>
+                  familyMetric === 'valor' ? b.total - a.total : b.units - a.units
+                )}
+                layout="vertical"
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis
                   type="number"
