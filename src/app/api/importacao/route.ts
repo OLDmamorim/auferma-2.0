@@ -30,15 +30,6 @@ function excelSerialToDate(serial: number): Date {
   return new Date(Date.UTC(1900, 0, 0) + adjusted * msPerDay)
 }
 
-const SKIP_BRANDS = new Set([
-  'descontos', 'transportes', 'rendas', 'imobilizado', 'diversos',
-  'outros', 'servicos', 'serviços',
-])
-
-const SKIP_FAMILIAS = new Set([
-  'transportes', 'rendas', 'imobilizado', 'outros', 'serviços', 'servicos',
-])
-
 interface ImportRow {
   // New format columns
   data: number | null        // Excel serial date
@@ -132,11 +123,6 @@ export async function POST(req: NextRequest) {
     const total = Number(row.vendas) || 0
     if (total <= 0) { skip('valor_zero'); continue }
 
-    // Skip unwanted brands/families
-    const marcaLower = row.marca ? row.marca.toLowerCase().trim() : ''
-    const familiaLower = row.familia ? row.familia.toLowerCase().trim() : ''
-    if (SKIP_BRANDS.has(marcaLower) || SKIP_FAMILIAS.has(familiaLower)) { skip('marca_ignorada'); continue }
-
     const nif = row.cliContr ? String(row.cliContr).trim() : null
     const cliId = row.cliId ? String(row.cliId).trim() : null
     if (!nif && !cliId) { skip('sem_cliente'); continue }
@@ -147,7 +133,7 @@ export async function POST(req: NextRequest) {
 
     const lookupNif = nif || `ID_${cliId}`
 
-    const brandName = row.marca && !SKIP_BRANDS.has(row.marca.toLowerCase()) ? row.marca.trim() : null
+    const brandName = row.marca ? row.marca.trim() : null
     if (brandName && !brandCache.has(brandName.toLowerCase())) newBrandNames.add(brandName)
 
     const vendedorRaw = row.colabNome ? String(row.colabNome) : null
@@ -169,7 +155,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const family = row.familia && !SKIP_FAMILIAS.has(familiaLower) ? row.familia.trim() : null
+    const family = row.familia ? row.familia.trim() : null
 
     validRows.push({
       lookupNif,

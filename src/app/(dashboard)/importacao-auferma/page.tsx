@@ -464,7 +464,7 @@ export default function ImportacaoAufermaPage() {
           <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Data →</span><span>Data da venda em formato serial Excel</span></div>
           <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Vendas →</span><span>Valor da venda (Doc_Id=NCDsc e valores ≤0 são ignorados)</span></div>
           <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Cli_CodPostal →</span><span>Zona do cliente (ex: "4435-321 RIO TINTO" → "RIO TINTO")</span></div>
-          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Ignorado →</span><span>Marcas: DIVERSOS, TRANSPORTES, RENDAS, IMOBILIZADO, OUTROS</span></div>
+          <div className="flex gap-2"><span className="font-medium w-36 flex-shrink-0">Ignorado →</span><span>Apenas notas de crédito (Doc_Id=NCDsc) e valores ≤0. Todas as marcas/famílias são importadas.</span></div>
         </div>
       </div>
     </div>
