@@ -57,9 +57,9 @@ function generateAIInsights(data: {
 
   if (data.avgOrderValue > 0) {
     if (data.avgOrderValue > 500) {
-      insights.push({ type: 'positive', title: 'Ticket médio elevado', body: `Valor médio de encomenda de €${data.avgOrderValue.toFixed(0)}. Indica clientes de maior dimensão e boas negociações.` })
+      insights.push({ type: 'positive', title: 'Average Order Value elevado', body: `Valor médio de encomenda de €${data.avgOrderValue.toFixed(0)}. Indica clientes de maior dimensão e boas negociações.` })
     } else if (data.avgOrderValue < 100) {
-      insights.push({ type: 'warning', title: 'Ticket médio baixo', body: `Valor médio de €${data.avgOrderValue.toFixed(0)} por venda. Oportunidade de upselling e cross-selling nos clientes existentes.` })
+      insights.push({ type: 'warning', title: 'Average Order Value baixo', body: `Valor médio de €${data.avgOrderValue.toFixed(0)} por venda. Oportunidade de upselling e cross-selling nos clientes existentes.` })
     }
   }
 

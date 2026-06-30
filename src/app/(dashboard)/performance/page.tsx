@@ -200,7 +200,7 @@ export default function PerformancePage() {
                 <th>Encomendas</th>
                 <th>Visitas</th>
                 <th>Tarefas</th>
-                <th>Ticket Médio</th>
+                <th>Average Order Value</th>
                 <th>Meta %</th>
               </tr>
             </thead>

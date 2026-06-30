@@ -123,7 +123,7 @@ export default function RadiografiaPage() {
           {/* ── KPI Row ── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Ticket Médio', value: fmt(data.summary.avgOrderValue), sub: `${data.summary.salesCount} vendas`, color: 'blue' },
+              { label: 'Average Order Value', value: fmt(data.summary.avgOrderValue), sub: `${data.summary.salesCount} vendas`, color: 'blue' },
               { label: 'Visitas/mês', value: data.summary.visitFreqPerMonth.toFixed(1), sub: `${data.summary.visitsThisYear} total no ano`, color: 'indigo' },
               { label: 'Conclusão tarefas', value: `${data.summary.taskCompletionRate.toFixed(0)}%`, sub: `${data.summary.completedTasks}/${data.summary.totalTasks} concluídas`, color: data.summary.taskCompletionRate >= 70 ? 'green' : 'amber' },
               { label: 'Clientes em risco', value: data.summary.atRiskCustomers, sub: `${data.summary.atRiskPct.toFixed(0)}% da carteira ativa`, color: data.summary.atRiskPct > 20 ? 'red' : 'orange' },
