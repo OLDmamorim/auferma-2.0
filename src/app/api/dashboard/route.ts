@@ -81,6 +81,7 @@ export async function GET() {
     monthlyTargets,
     pendingTasks,
     recentVisits,
+    lastSaleAgg,
     topCustomers,
   ] = await Promise.all([
     // Total sales this month
@@ -151,6 +152,11 @@ export async function GET() {
         date: { gte: thirtyDaysAgo },
         ...(role === 'COMMERCIAL' ? { commercialId: userId } : {})
       }
+    }),
+    // Most recent sale date (last analysed day)
+    prisma.sale.aggregate({
+      where: { customer: customerFilter },
+      _max: { date: true },
     }),
     // Top customers — sales of current + last year for deviation %
     prisma.customer.findMany({
@@ -272,6 +278,7 @@ export async function GET() {
 
   return NextResponse.json({
     aiInsights,
+    lastSaleDate: lastSaleAgg._max.date,
     kpis: {
       totalSalesMonth: thisMonthTotal,
       totalSalesLastMonth: lastMonthTotal,
