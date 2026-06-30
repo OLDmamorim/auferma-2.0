@@ -68,9 +68,21 @@ export async function POST(req: NextRequest) {
   const filename: string = body.filename || 'import.xlsx'
   const isLastChunk: boolean = body.isLastChunk === true
   const createCommercials: boolean = body.createCommercials === true
+  const replaceMonths: { year: number; month: number }[] = Array.isArray(body.replaceMonths) ? body.replaceMonths : []
 
   if (rows.length === 0) {
     return NextResponse.json({ error: 'Sem linhas para importar' }, { status: 400 })
+  }
+
+  // ── "Replace months" mode: clear existing sales in the months present in the
+  //    file before inserting, so a monthly file updates only those months. ─────
+  if (replaceMonths.length > 0) {
+    const ranges = replaceMonths
+      .filter(m => m && m.year && m.month)
+      .map(m => ({ date: { gte: new Date(Date.UTC(m.year, m.month - 1, 1)), lt: new Date(Date.UTC(m.year, m.month, 1)) } }))
+    if (ranges.length > 0) {
+      await prisma.sale.deleteMany({ where: { OR: ranges } })
+    }
   }
 
   // ── Pre-load all existing data ─────────────────────────────────────────────

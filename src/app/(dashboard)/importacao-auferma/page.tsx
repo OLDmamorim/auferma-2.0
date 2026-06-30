@@ -35,6 +35,7 @@ export default function ImportacaoAufermaPage() {
   const [resetting, setResetting] = useState(false)
   const [resetDone, setResetDone] = useState(false)
   const [createCommercials, setCreateCommercials] = useState(true)
+  const [replaceMonths, setReplaceMonths] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fetchStats = useCallback(() => {
@@ -151,6 +152,21 @@ export default function ImportacaoAufermaPage() {
         quantidade: quantKey ? (parseFloat(String(r[quantKey] ?? 0)) || 0) : 0,
       }))
 
+      // Months present in the file (for "replace months" mode) — YYYY-M from Excel serials
+      const monthsSet = new Set<string>()
+      if (replaceMonths) {
+        for (const r of rows) {
+          if (r.data == null) continue
+          const adj = r.data > 59 ? r.data - 1 : r.data
+          const d = new Date(Date.UTC(1900, 0, 0) + adj * 86400000)
+          if (!isNaN(d.getTime())) monthsSet.add(`${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`)
+        }
+      }
+      const monthsPresent = Array.from(monthsSet).map(s => {
+        const [y, m] = s.split('-').map(Number)
+        return { year: y, month: m }
+      })
+
       // ── 3. Send in chunks ──────────────────────────────────────────────
       const totals: Totals = { imported: 0, skipped: 0, errors: 0, errorLog: [], skipReasons: {} }
       const numChunks = Math.ceil(rows.length / CHUNK_SIZE)
@@ -159,6 +175,7 @@ export default function ImportacaoAufermaPage() {
       for (let i = 0; i < numChunks; i++) {
         const chunk = rows.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
         const isLastChunk = i === numChunks - 1
+        const isFirstChunk = i === 0
         setPhase(`A importar bloco ${i + 1} de ${numChunks}...`)
 
         let attempt = 0
@@ -168,7 +185,10 @@ export default function ImportacaoAufermaPage() {
             const res = await fetch('/api/importacao', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ rows: chunk, filename: file.name, isLastChunk, createCommercials }),
+              body: JSON.stringify({
+                rows: chunk, filename: file.name, isLastChunk, createCommercials,
+                ...(isFirstChunk && replaceMonths ? { replaceMonths: monthsPresent } : {}),
+              }),
             })
             if (!res.ok) {
               const txt = await res.text()
@@ -262,7 +282,7 @@ export default function ImportacaoAufermaPage() {
       )}
 
       {/* Options */}
-      <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-4 mb-5">
+      <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-4 mb-5 space-y-4">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -274,6 +294,21 @@ export default function ImportacaoAufermaPage() {
             <p className="text-sm font-medium text-gray-900">Criar comerciais automaticamente</p>
             <p className="text-xs text-gray-500 mt-0.5">
               Cria um utilizador para cada vendedor do Excel que não exista (ex: António Antunes → aantunes@auferma.pt, password inicial: auferma123)
+            </p>
+          </div>
+        </label>
+
+        <label className="flex items-start gap-3 cursor-pointer border-t border-gray-100 pt-4">
+          <input
+            type="checkbox"
+            checked={replaceMonths}
+            onChange={e => setReplaceMonths(e.target.checked)}
+            className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <div>
+            <p className="text-sm font-medium text-gray-900">Atualizar apenas os meses do ficheiro (sem limpar a BD)</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Substitui as vendas dos meses presentes no ficheiro e mantém os restantes. Ideal para atualizações mensais — <strong>não precisa de Limpar BD</strong> e evita duplicados. Os meses não incluídos no ficheiro ficam intactos.
             </p>
           </div>
         </label>
