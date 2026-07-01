@@ -46,15 +46,30 @@ function generateDashboardInsights(d: {
   return insights.slice(0, 6)
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const now = new Date()
-  const currentYear = now.getFullYear()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+
+  // Months that actually have sales — powers the month selector + default
+  const monthsWithData = await prisma.$queryRaw<{ y: number; m: number }[]>`
+    SELECT DISTINCT EXTRACT(YEAR FROM date)::int AS y, EXTRACT(MONTH FROM date)::int AS m
+    FROM "Sale"
+    ORDER BY y DESC, m DESC
+  `
+  const latest = monthsWithData[0]
+
+  const sp = new URL(req.url).searchParams
+  const qMonth = parseInt(sp.get('month') || '')
+  const qYear = parseInt(sp.get('year') || '')
+  const selYear = Number.isFinite(qYear) ? qYear : (latest ? latest.y : now.getFullYear())
+  const selMonth = Number.isFinite(qMonth) ? qMonth : (latest ? latest.m : now.getMonth() + 1) // 1-based
+
+  const currentYear = selYear
+  const startOfMonth = new Date(selYear, selMonth - 1, 1)
+  const startOfLastMonth = new Date(selYear, selMonth - 2, 1)
+  const endOfLastMonth = new Date(selYear, selMonth - 1, 0, 23, 59, 59, 999)
   const startOfLastYear = new Date(currentYear - 1, 0, 1)
   const startOfThisYear = new Date(currentYear, 0, 1)
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
@@ -248,7 +263,7 @@ export async function GET() {
   })
 
   // ── Team AI analysis ───────────────────────────────────────────────────────
-  const currentMonthIdx = now.getMonth() // 0-based; months elapsed so far
+  const currentMonthIdx = selMonth - 1 // 0-based selected month
   let yoyThis = 0
   let yoyLast = 0
   for (let i = 0; i <= currentMonthIdx; i++) {
@@ -279,6 +294,9 @@ export async function GET() {
   return NextResponse.json({
     aiInsights,
     lastSaleDate: lastSaleAgg._max.date,
+    availableMonths: monthsWithData.map(x => ({ year: x.y, month: x.m })),
+    selectedMonth: selMonth,
+    selectedYear: selYear,
     kpis: {
       totalSalesMonth: thisMonthTotal,
       totalSalesLastMonth: lastMonthTotal,
