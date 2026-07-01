@@ -35,7 +35,6 @@ export default function ImportacaoAufermaPage() {
   const [resetting, setResetting] = useState(false)
   const [resetDone, setResetDone] = useState(false)
   const [createCommercials, setCreateCommercials] = useState(true)
-  const [replaceMonths, setReplaceMonths] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fetchStats = useCallback(() => {
@@ -152,15 +151,14 @@ export default function ImportacaoAufermaPage() {
         quantidade: quantKey ? (parseFloat(String(r[quantKey] ?? 0)) || 0) : 0,
       }))
 
-      // Months present in the file (for "replace months" mode) — YYYY-M from Excel serials
+      // Always replace the months present in the file so re-importing never
+      // duplicates. YYYY-M derived from the Excel serial dates.
       const monthsSet = new Set<string>()
-      if (replaceMonths) {
-        for (const r of rows) {
-          if (r.data == null) continue
-          const adj = r.data > 59 ? r.data - 1 : r.data
-          const d = new Date(Date.UTC(1900, 0, 0) + adj * 86400000)
-          if (!isNaN(d.getTime())) monthsSet.add(`${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`)
-        }
+      for (const r of rows) {
+        if (r.data == null) continue
+        const adj = r.data > 59 ? r.data - 1 : r.data
+        const d = new Date(Date.UTC(1900, 0, 0) + adj * 86400000)
+        if (!isNaN(d.getTime())) monthsSet.add(`${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`)
       }
       const monthsPresent = Array.from(monthsSet).map(s => {
         const [y, m] = s.split('-').map(Number)
@@ -187,7 +185,7 @@ export default function ImportacaoAufermaPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 rows: chunk, filename: file.name, isLastChunk, createCommercials,
-                ...(isFirstChunk && replaceMonths ? { replaceMonths: monthsPresent } : {}),
+                ...(isFirstChunk ? { replaceMonths: monthsPresent } : {}),
               }),
             })
             if (!res.ok) {
@@ -298,20 +296,15 @@ export default function ImportacaoAufermaPage() {
           </div>
         </label>
 
-        <label className="flex items-start gap-3 cursor-pointer border-t border-gray-100 pt-4">
-          <input
-            type="checkbox"
-            checked={replaceMonths}
-            onChange={e => setReplaceMonths(e.target.checked)}
-            className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
+        <div className="flex items-start gap-3 border-t border-gray-100 pt-4">
+          <div className="mt-0.5 w-4 h-4 rounded bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0 text-xs">✓</div>
           <div>
-            <p className="text-sm font-medium text-gray-900">Atualizar apenas os meses do ficheiro (sem limpar a BD)</p>
+            <p className="text-sm font-medium text-gray-900">Reimportação segura (automática)</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Substitui as vendas dos meses presentes no ficheiro e mantém os restantes. Ideal para atualizações mensais — <strong>não precisa de Limpar BD</strong> e evita duplicados. Os meses não incluídos no ficheiro ficam intactos.
+              A importação <strong>substitui sempre os meses presentes no ficheiro</strong> e mantém os restantes. Podes reimportar o mesmo ficheiro sem duplicar e <strong>sem precisar de Limpar BD</strong>. Os meses que não estão no ficheiro ficam intactos.
             </p>
           </div>
-        </label>
+        </div>
       </div>
 
       {/* Drop zone */}
