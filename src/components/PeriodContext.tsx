@@ -34,7 +34,7 @@ export function PeriodProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    fetch('/api/periods')
+    fetch('/api/periods', { cache: 'no-store' })
       .then(r => r.json())
       .then((d: { months: Period[] }) => {
         const list = d.months || []

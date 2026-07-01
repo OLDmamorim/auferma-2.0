@@ -30,7 +30,7 @@ export default function ComerciaisPage() {
     if (!ready) return
     setLoading(true)
     const qs = period ? `?year=${period.year}` : ''
-    fetch(`/api/comerciais${qs}`)
+    fetch(`/api/comerciais${qs}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { setUsers(Array.isArray(d) ? d : []); setLoading(false) })
   }, [role, period, ready])

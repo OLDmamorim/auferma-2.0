@@ -216,7 +216,7 @@ export default function MeuPainelPage() {
     if (!ready) return
     setLoading(true)
     const qs = period ? `?year=${period.year}&month=${period.month}` : ''
-    fetch(`/api/meu-painel${qs}`)
+    fetch(`/api/meu-painel${qs}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
