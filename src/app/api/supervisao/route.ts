@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -16,6 +16,15 @@ export async function GET() {
   const year = now.getFullYear()
   const month = now.getMonth() // 0-indexed
   const dayOfMonth = now.getDate()
+
+  // Selected period (global) — drives the monthly sales/target figures.
+  // Activity status/week/today remain relative to now.
+  const sp = new URL(req.url).searchParams
+  const qYear = parseInt(sp.get('year') || '')
+  const qMonth = parseInt(sp.get('month') || '') // 1-based
+  const selYear = Number.isFinite(qYear) ? qYear : year
+  const selMonth = Number.isFinite(qMonth) ? qMonth - 1 : month // 0-indexed
+  const endOfSelMonth = new Date(selYear, selMonth + 1, 0, 23, 59, 59, 999)
 
   // Start of today
   const startOfToday = new Date(year, month, dayOfMonth, 0, 0, 0, 0)
@@ -30,8 +39,8 @@ export async function GET() {
   endOfWeek.setDate(startOfWeek.getDate() + 6)
   endOfWeek.setHours(23, 59, 59, 999)
 
-  // Start of this month
-  const startOfMonth = new Date(year, month, 1)
+  // Start of the selected month
+  const startOfMonth = new Date(selYear, selMonth, 1)
 
   // Time thresholds for status/alerts
   const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
@@ -82,12 +91,12 @@ export async function GET() {
       },
       _sum: { total: true },
     }),
-    // Sales this month per commercial
+    // Sales in the selected month per commercial
     prisma.sale.groupBy({
       by: ['commercialId'],
       where: {
         commercialId: { in: commercialIds },
-        date: { gte: startOfMonth },
+        date: { gte: startOfMonth, lte: endOfSelMonth },
       },
       _sum: { total: true },
     }),
@@ -128,12 +137,12 @@ export async function GET() {
       },
       _count: { id: true },
     }),
-    // CommercialTarget for current month
+    // CommercialTarget for the selected month
     prisma.commercialTarget.findMany({
       where: {
         userId: { in: commercialIds },
-        year,
-        month: month + 1,
+        year: selYear,
+        month: selMonth + 1,
       },
       select: { userId: true, target: true, achieved: true },
     }),

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -11,7 +11,8 @@ export async function GET() {
   if (role === 'COMMERCIAL') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const now = new Date()
-  const year = now.getFullYear()
+  const qYear = parseInt(new URL(req.url).searchParams.get('year') || '')
+  const year = Number.isFinite(qYear) ? qYear : now.getFullYear()
   const startOfYear = new Date(year, 0, 1)
   const endOfYear = new Date(year + 1, 0, 1)
 

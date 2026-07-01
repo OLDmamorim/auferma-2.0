@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { formatDate, formatCurrency, daysAgo } from '@/lib/utils'
 import KpiCard from '@/components/ui/KpiCard'
 import PageHeader from '@/components/layout/PageHeader'
+import { usePeriod } from '@/components/PeriodContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -209,13 +210,17 @@ export default function MeuPainelPage() {
   const { data: session } = useSession()
   const [data, setData] = useState<PainelData | null>(null)
   const [loading, setLoading] = useState(true)
+  const { period, ready } = usePeriod()
 
   useEffect(() => {
-    fetch('/api/meu-painel')
+    if (!ready) return
+    setLoading(true)
+    const qs = period ? `?year=${period.year}&month=${period.month}` : ''
+    fetch(`/api/meu-painel${qs}`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [period, ready])
 
   const userName = session?.user?.name?.split(' ')[0] || 'Utilizador'
   const role = (session?.user as any)?.role

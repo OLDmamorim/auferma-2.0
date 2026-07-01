@@ -12,8 +12,11 @@ export async function GET(req: NextRequest) {
   const isDirector = role === 'ADMIN' || role === 'DIRECTOR'
 
   const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() // 0-indexed
+  const sp = new URL(req.url).searchParams
+  const qYear = parseInt(sp.get('year') || '')
+  const qMonth = parseInt(sp.get('month') || '') // 1-based
+  const year = Number.isFinite(qYear) ? qYear : now.getFullYear()
+  const month = Number.isFinite(qMonth) ? qMonth - 1 : now.getMonth() // 0-indexed
   const startOfMonth = new Date(year, month, 1)
   const startOfLastMonth = new Date(year, month - 1, 1)
   const endOfLastMonth = new Date(year, month, 0, 23, 59, 59, 999)

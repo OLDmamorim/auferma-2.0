@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import PageHeader from '@/components/layout/PageHeader'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
+import { usePeriod } from '@/components/PeriodContext'
 
 interface CommercialData {
   id: string
@@ -47,11 +48,14 @@ export default function SupervisaoPage() {
   const [data, setData] = useState<{ commercials: CommercialData[]; team: TeamSummary } | null>(null)
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'cards' | 'table'>('cards')
+  const { period, ready } = usePeriod()
 
   const fetchData = useCallback(() => {
+    if (!ready) return
     setLoading(true)
-    fetch('/api/supervisao').then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
-  }, [])
+    const qs = period ? `?year=${period.year}&month=${period.month}` : ''
+    fetch(`/api/supervisao${qs}`).then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
+  }, [period, ready])
 
   useEffect(() => { fetchData() }, [fetchData])
 

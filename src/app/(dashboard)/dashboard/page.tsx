@@ -8,6 +8,7 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import KpiCard from '@/components/ui/KpiCard'
 import PageHeader from '@/components/layout/PageHeader'
+import { usePeriod, monthLabel } from '@/components/PeriodContext'
 import Link from 'next/link'
 
 const COLORS = ['#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777', '#0891b2']
@@ -46,26 +47,25 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [familyMetric, setFamilyMetric] = useState<'valor' | 'unidades'>('unidades')
-  // null = let the server pick the latest month with data
-  const [sel, setSel] = useState<{ year: number; month: number } | null>(null)
+  const { period, ready } = usePeriod()
   const role = (session?.user as any)?.role
 
   useEffect(() => {
+    if (!ready) return
     setLoading(true)
-    const qs = sel ? `?year=${sel.year}&month=${sel.month}` : ''
+    const qs = period ? `?year=${period.year}&month=${period.month}` : ''
     fetch(`/api/dashboard${qs}`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [sel])
+  }, [period, ready])
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
 
-  const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-  const curMonth = sel?.month ?? data?.selectedMonth
-  const curYear = sel?.year ?? data?.selectedYear
-  const monthLabel = curMonth && curYear ? `${MONTH_NAMES[curMonth - 1]} ${curYear}` : 'mês'
+  const curMonth = period?.month ?? data?.selectedMonth
+  const curYear = period?.year ?? data?.selectedYear
+  const monthLabelText = monthLabel(curMonth && curYear ? { year: curYear, month: curMonth } : null)
 
   return (
     <div className="p-6">
@@ -74,22 +74,6 @@ export default function DashboardPage() {
         subtitle={`Dashboard comercial — ${new Date().toLocaleDateString('pt-PT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
-            {data?.availableMonths && data.availableMonths.length > 0 && (
-              <select
-                value={curMonth && curYear ? `${curYear}-${curMonth}` : ''}
-                onChange={e => {
-                  const [y, m] = e.target.value.split('-').map(Number)
-                  setSel({ year: y, month: m })
-                }}
-                className="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {data.availableMonths.map(mo => (
-                  <option key={`${mo.year}-${mo.month}`} value={`${mo.year}-${mo.month}`}>
-                    {MONTH_NAMES[mo.month - 1]} {mo.year}
-                  </option>
-                ))}
-              </select>
-            )}
             {data?.lastSaleDate && (
               <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-gray-600 px-3 py-2 rounded-lg text-xs font-medium">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -109,7 +93,7 @@ export default function DashboardPage() {
         {loading ? Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-28" />) : (
           <>
             <KpiCard
-              title={`Vendas — ${monthLabel}`}
+              title={`Vendas — ${monthLabelText}`}
               value={formatCurrency(data?.kpis.totalSalesMonth || 0)}
               change={data?.kpis.monthChange}
               color="blue"
@@ -293,7 +277,7 @@ export default function DashboardPage() {
         {/* Sales by Commercial - only for director/admin */}
         {role !== 'COMMERCIAL' && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Comercial — {monthLabel}</h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Comercial — {monthLabelText}</h2>
             {loading ? <Skeleton className="h-48" /> : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data?.salesByCommercial || []}>

@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 import PageHeader from '@/components/layout/PageHeader'
+import { usePeriod } from '@/components/PeriodContext'
 
 interface Commercial {
   id: string
@@ -22,12 +23,17 @@ export default function ComerciaisPage() {
   const [users, setUsers] = useState<Commercial[]>([])
   const [loading, setLoading] = useState(true)
 
+  const { period, ready } = usePeriod()
+
   useEffect(() => {
     if (role && !['ADMIN', 'DIRECTOR'].includes(role)) return
-    fetch('/api/comerciais')
+    if (!ready) return
+    setLoading(true)
+    const qs = period ? `?year=${period.year}` : ''
+    fetch(`/api/comerciais${qs}`)
       .then(r => r.json())
       .then(d => { setUsers(Array.isArray(d) ? d : []); setLoading(false) })
-  }, [role])
+  }, [role, period, ready])
 
   if (role === 'COMMERCIAL') {
     return (

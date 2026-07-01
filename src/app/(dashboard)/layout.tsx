@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import PwaInstallBanner from '@/components/PwaInstallBanner'
+import { PeriodProvider, PeriodSelector } from '@/components/PeriodContext'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -44,6 +45,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
+        {/* Global period bar */}
+        <div className="flex items-center gap-2 px-4 md:px-6 py-2 bg-white border-b border-gray-100 sticky top-0 md:top-0 z-20">
+          <span className="text-xs font-medium text-gray-500">Período:</span>
+          <PeriodSelector />
+          <span className="text-[11px] text-gray-400 hidden sm:inline">aplica-se ao Dashboard, Comerciais, Supervisão e Meu Painel</span>
+        </div>
+
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
@@ -54,5 +62,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return <DashboardContent>{children}</DashboardContent>
+  return (
+    <PeriodProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </PeriodProvider>
+  )
 }
