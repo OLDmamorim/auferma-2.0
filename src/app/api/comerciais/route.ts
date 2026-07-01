@@ -54,5 +54,5 @@ export async function GET(req: Request) {
     return { ...u, orcamento, vendasAno, desvio }
   })
 
-  return NextResponse.json(result)
+  return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } })
 }

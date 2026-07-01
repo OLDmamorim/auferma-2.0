@@ -318,5 +318,5 @@ export async function GET(req: Request) {
     })),
     monthlySales: monthlySeries,
     topCustomers: topCustomersSorted,
-  })
+  }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } })
 }

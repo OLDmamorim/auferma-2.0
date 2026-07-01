@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       visitsThisWeek: { count: visitsThisWeekCount, items: [] },
       recentSales,
       commercialsCount,
-    })
+    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } })
   }
 
   // ── COMMERCIAL: personal data ─────────────────────────────────────────────
@@ -156,5 +156,5 @@ export async function GET(req: NextRequest) {
     pendingTasks,
     visitsThisWeek: { count: visitsThisWeekRaw.length, items: visitsThisWeekRaw },
     recentSales,
-  })
+  }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } })
 }

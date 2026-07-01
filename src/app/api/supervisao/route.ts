@@ -368,5 +368,5 @@ export async function GET(req: Request) {
       inactive: inactiveCount,
     },
     alerts: alerts.slice(0, 20),
-  })
+  }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } })
 }

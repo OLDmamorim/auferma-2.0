@@ -1,4 +1,4 @@
-const CACHE_NAME = 'auferma-v1';
+const CACHE_NAME = 'auferma-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',

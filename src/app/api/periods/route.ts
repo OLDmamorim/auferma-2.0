@@ -16,5 +16,5 @@ export async function GET() {
     FROM "Sale"
     ORDER BY y DESC, m DESC
   `
-  return NextResponse.json({ months: rows.map(r => ({ year: r.y, month: r.m })) })
+  return NextResponse.json({ months: rows.map(r => ({ year: r.y, month: r.m })) }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } })
 }
