@@ -63,7 +63,7 @@ export default function DashboardPage() {
         actions={
           <div className="flex items-center gap-2">
             {data?.lastSaleDate && (
-              <div className="hidden sm:flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-gray-600 px-3 py-2 rounded-lg text-xs font-medium">
+              <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-gray-600 px-3 py-2 rounded-lg text-xs font-medium">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 Dados até {new Date(data.lastSaleDate).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })}
               </div>
