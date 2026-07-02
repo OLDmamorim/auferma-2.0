@@ -8,6 +8,7 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  engine?: string
 }
 
 const suggestions = [
@@ -19,13 +20,19 @@ const suggestions = [
 ]
 
 function MessageContent({ content }: { content: string }) {
-  // Render markdown-like content: **bold**, bullet points, line breaks
   const lines = content.split('\n')
   return (
     <div className="space-y-1">
       {lines.map((line, i) => {
         if (!line.trim()) return <div key={i} className="h-2" />
-        // Bold text **text**
+        // H3
+        if (line.startsWith('### ')) {
+          return <p key={i} className="text-sm font-bold text-gray-800 mt-2">{line.slice(4)}</p>
+        }
+        // H2
+        if (line.startsWith('## ')) {
+          return <p key={i} className="text-sm font-bold text-gray-900 mt-2">{line.slice(3)}</p>
+        }
         const parts = line.split(/\*\*(.*?)\*\*/g)
         return (
           <p key={i} className="text-sm leading-relaxed">
@@ -82,14 +89,22 @@ export default function AssistentePage() {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg }),
+        body: JSON.stringify({
+          message: msg,
+          history: messages
+            .filter(m => m.id !== '0')
+            .map(m => ({ role: m.role, content: m.content })),
+        }),
       })
       const data = await res.json()
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.response || 'Desculpe, não consegui processar o pedido.',
+        content: data.engine === 'rules-fallback' && data.error
+          ? `${data.response || ''}\n\n_Erro OpenAI: ${data.error}_`
+          : data.response || 'Desculpe, não consegui processar o pedido.',
         timestamp: new Date(),
+        engine: data.engine,
       }])
     } catch {
       setMessages(prev => [...prev, {
@@ -110,14 +125,28 @@ export default function AssistentePage() {
         actions={
           <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            Sistema de regras ativo · OpenAI pronto para integrar
+            IA generativa ativa
           </div>
         }
       />
 
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+        {/* Suggestions - mobile: horizontal scroll row, desktop: sidebar */}
+        <div className="lg:hidden flex gap-2 overflow-x-auto pb-1 flex-shrink-0">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => sendMessage(s)}
+              disabled={loading}
+              className="flex-shrink-0 text-xs text-gray-700 bg-white border border-gray-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 px-3 py-2 rounded-lg transition disabled:opacity-50"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden min-h-0">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map(msg => (
@@ -141,6 +170,11 @@ export default function AssistentePage() {
                   )}
                   <p className={`text-xs mt-1.5 ${msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}>
                     {msg.timestamp.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                    {msg.engine && msg.role === 'assistant' && (
+                      <span className="ml-2 opacity-60">
+                        {msg.engine === 'openai' ? '· GPT-4o' : msg.engine === 'rules-fallback' ? '· regras (OpenAI falhou)' : '· regras'}
+                      </span>
+                    )}
                   </p>
                 </div>
                 {msg.role === 'user' && (
@@ -195,8 +229,8 @@ export default function AssistentePage() {
           </div>
         </div>
 
-        {/* Sidebar with suggestions */}
-        <div className="w-64 flex flex-col gap-4">
+        {/* Sidebar with suggestions - desktop only */}
+        <div className="hidden lg:flex w-64 flex-col gap-4">
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Sugestões</h3>
             <div className="space-y-2">
@@ -214,9 +248,9 @@ export default function AssistentePage() {
           </div>
 
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-            <h3 className="text-xs font-semibold text-blue-800 mb-2">🤖 Integração OpenAI</h3>
+            <h3 className="text-xs font-semibold text-blue-800 mb-2">🤖 Como funciona</h3>
             <p className="text-xs text-blue-700">
-              Para ativar o assistente com IA generativa, adicione a variável <code className="bg-blue-100 px-1 rounded">OPENAI_API_KEY</code> nas configurações do Netlify.
+              O assistente analisa os dados reais da sua carteira (clientes, vendas, visitas, tarefas e risco) e responde a qualquer pergunta com IA generativa. Escreva livremente.
             </p>
           </div>
         </div>

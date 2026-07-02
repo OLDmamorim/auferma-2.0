@@ -8,11 +8,19 @@ import {
 import { formatCurrency } from '@/lib/utils'
 import KpiCard from '@/components/ui/KpiCard'
 import PageHeader from '@/components/layout/PageHeader'
+import { usePeriod, monthLabel } from '@/components/PeriodContext'
 import Link from 'next/link'
 
 const COLORS = ['#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777', '#0891b2']
 
+interface Insight { type: 'positive' | 'warning' | 'danger'; title: string; body: string }
+
 interface DashboardData {
+  aiInsights?: Insight[]
+  lastSaleDate?: string | null
+  availableMonths?: { year: number; month: number }[]
+  selectedMonth?: number
+  selectedYear?: number
   kpis: {
     totalSalesMonth: number
     totalSalesLastMonth: number
@@ -24,10 +32,10 @@ interface DashboardData {
     pendingTasks: number
     recentVisits: number
   }
-  salesByBrand: { name: string; total: number }[]
+  salesByBrand: { name: string; total: number; units: number }[]
   salesByCommercial: { name: string; total: number }[]
-  monthlySales: { month: string; total: number }[]
-  topCustomers: { id: string; name: string; zone: string | null; total: number }[]
+  monthlySales: { month: string; total: number; homologo: number; orcamento: number }[]
+  topCustomers: { id: string; name: string; zone: string | null; commercial: string | null; total: number; lastYear: number; desvio: number | null }[]
 }
 
 function Skeleton({ className }: { className?: string }) {
@@ -38,17 +46,26 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [familyMetric, setFamilyMetric] = useState<'valor' | 'unidades'>('unidades')
+  const { period, ready } = usePeriod()
   const role = (session?.user as any)?.role
 
   useEffect(() => {
-    fetch('/api/dashboard')
+    if (!ready) return
+    setLoading(true)
+    const qs = period ? `?year=${period.year}&month=${period.month}` : ''
+    fetch(`/api/dashboard${qs}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [period, ready])
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+
+  const curMonth = period?.month ?? data?.selectedMonth
+  const curYear = period?.year ?? data?.selectedYear
+  const monthLabelText = monthLabel(curMonth && curYear ? { year: curYear, month: curMonth } : null)
 
   return (
     <div className="p-6">
@@ -56,10 +73,18 @@ export default function DashboardPage() {
         title={`${greeting}, ${session?.user?.name?.split(' ')[0] || 'utilizador'} 👋`}
         subtitle={`Dashboard comercial — ${new Date().toLocaleDateString('pt-PT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`}
         actions={
-          <Link href="/assistente" className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-            Assistente IA
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            {data?.lastSaleDate && (
+              <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-gray-600 px-3 py-2 rounded-lg text-xs font-medium">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                Dados até {new Date(data.lastSaleDate).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </div>
+            )}
+            <Link href="/assistente" className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+              Assistente IA
+            </Link>
+          </div>
         }
       />
 
@@ -68,7 +93,7 @@ export default function DashboardPage() {
         {loading ? Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-28" />) : (
           <>
             <KpiCard
-              title="Vendas este mês"
+              title={`Vendas — ${monthLabelText}`}
               value={formatCurrency(data?.kpis.totalSalesMonth || 0)}
               change={data?.kpis.monthChange}
               color="blue"
@@ -109,11 +134,47 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* AI Analysis */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 bg-purple-100 rounded-lg flex items-center justify-center">
+            <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 001.5 2.121m-1.5-2.121c.251.023.501.05.75.082M15 14.5l-4.091 4.091M15 14.5l.659 1.591a2.25 2.25 0 01-1.591 3.182L5 21" />
+            </svg>
+          </div>
+          <h2 className="text-sm font-semibold text-gray-900">Análise IA</h2>
+          <span className="text-xs text-gray-400 ml-auto">Gerado automaticamente com base nos dados reais</span>
+        </div>
+        {loading ? (
+          <Skeleton className="h-24" />
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">
+            {(data?.aiInsights || []).map((ins, i) => (
+              <div key={i} className={`flex gap-3 p-4 rounded-xl border-l-4 ${
+                ins.type === 'positive' ? 'bg-green-50 border-green-400' :
+                ins.type === 'warning' ? 'bg-amber-50 border-amber-400' :
+                'bg-red-50 border-red-400'
+              }`}>
+                <div className={`text-lg ${ins.type === 'positive' ? 'text-green-500' : ins.type === 'warning' ? 'text-amber-500' : 'text-red-500'}`}>
+                  {ins.type === 'positive' ? '↑' : ins.type === 'warning' ? '⚠' : '⚡'}
+                </div>
+                <div>
+                  <p className={`text-xs font-semibold mb-1 ${ins.type === 'positive' ? 'text-green-700' : ins.type === 'warning' ? 'text-amber-700' : 'text-red-700'}`}>
+                    {ins.title}
+                  </p>
+                  <p className="text-xs text-gray-600 leading-relaxed">{ins.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {/* Monthly Sales Chart */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Evolução de Vendas (12 meses)</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Evolução de Vendas vs Ano Anterior e Orçamento</h2>
           {loading ? <Skeleton className="h-56" /> : (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={data?.monthlySales || []}>
@@ -121,23 +182,47 @@ export default function DashboardPage() {
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `€${(v/1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: number) => formatCurrency(v)} labelStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="total" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" name="Este ano" dataKey="total" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Line type="monotone" name="Ano anterior" dataKey="homologo" stroke="#dc2626" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                <Line type="monotone" name="Orçamento" dataKey="orcamento" stroke="#16a34a" strokeWidth={2} dot={false} strokeDasharray="6 3" />
               </LineChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Sales by Brand */}
+        {/* Sales by Family */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Marca (30 dias)</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Vendas por Família (este ano)</h2>
+            <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setFamilyMetric('valor')}
+                className={`px-3 py-1 text-xs font-medium transition ${familyMetric === 'valor' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >€</button>
+              <button
+                onClick={() => setFamilyMetric('unidades')}
+                className={`px-3 py-1 text-xs font-medium transition ${familyMetric === 'unidades' ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >Unidades</button>
+            </div>
+          </div>
           {loading ? <Skeleton className="h-56" /> : (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={data?.salesByBrand || []} layout="vertical">
+              <BarChart
+                data={[...(data?.salesByBrand || [])].sort((a, b) =>
+                  familyMetric === 'valor' ? b.total - a.total : b.units - a.units
+                )}
+                layout="vertical"
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => `€${(v/1000).toFixed(0)}k`} />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={v => familyMetric === 'valor' ? `€${(v/1000).toFixed(0)}k` : `${v}`}
+                />
                 <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                <Bar dataKey="total" fill="#2563eb" radius={[0, 4, 4, 0]}>
+                <Tooltip formatter={(v: number) => familyMetric === 'valor' ? formatCurrency(v) : `${v.toLocaleString('pt-PT')} un.`} />
+                <Bar dataKey={familyMetric === 'valor' ? 'total' : 'units'} radius={[0, 4, 4, 0]}>
                   {(data?.salesByBrand || []).map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
@@ -153,7 +238,7 @@ export default function DashboardPage() {
         {/* Top Customers */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">Top Clientes (12 meses)</h2>
+            <h2 className="text-sm font-semibold text-gray-900">Clientes por Desvio vs Ano Anterior</h2>
             <Link href="/clientes" className="text-xs text-blue-600 hover:text-blue-800 font-medium">Ver todos →</Link>
           </div>
           {loading ? <Skeleton className="h-48" /> : (
@@ -162,8 +247,8 @@ export default function DashboardPage() {
                 <tr>
                   <th>#</th>
                   <th>Cliente</th>
-                  <th>Zona</th>
-                  <th className="text-right">Total</th>
+                  <th>Vendedor</th>
+                  <th className="text-right">Desvio</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,8 +260,13 @@ export default function DashboardPage() {
                         {c.name}
                       </Link>
                     </td>
-                    <td className="text-gray-500">{c.zone || '—'}</td>
-                    <td className="text-right font-semibold text-gray-900">{formatCurrency(c.total)}</td>
+                    <td className="text-gray-500">{c.commercial || '—'}</td>
+                    <td className={`text-right font-semibold ${
+                      c.desvio === null ? 'text-gray-400'
+                        : c.desvio >= 0 ? 'text-green-600' : 'text-red-500'
+                    }`}>
+                      {c.desvio === null ? '—' : `${c.desvio >= 0 ? '+' : ''}${c.desvio.toFixed(1)}%`}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -187,7 +277,7 @@ export default function DashboardPage() {
         {/* Sales by Commercial - only for director/admin */}
         {role !== 'COMMERCIAL' && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Comercial (este mês)</h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">Vendas por Comercial — {monthLabelText}</h2>
             {loading ? <Skeleton className="h-48" /> : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data?.salesByCommercial || []}>

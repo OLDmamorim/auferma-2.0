@@ -63,6 +63,7 @@ model User {
   createdTasks  Task[]    @relation("CreatedTasks")
   visits        Visit[]
   targets       CommercialTarget[]
+  proposals     Proposal[]         @relation("CommercialProposals")
 }
 
 model Brand {
@@ -111,6 +112,7 @@ model Customer {
   visits            Visit[]
   scores            CustomerScore[]
   recommendations   AiRecommendation[]
+  proposals         Proposal[]
 }
 
 model Sale {
@@ -119,9 +121,11 @@ model Sale {
   customer     Customer   @relation(fields: [customerId], references: [id])
   brandId      String?
   brand        Brand?     @relation(fields: [brandId], references: [id])
+  family       String?
   commercialId String?
   date         DateTime
   total        Float
+  quantity     Float      @default(0)
   margin       Float?
   items        SaleItem[]
   createdAt    DateTime   @default(now())
@@ -172,14 +176,15 @@ model Visit {
 }
 
 model CommercialTarget {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  year      Int
-  month     Int
-  target    Float
-  achieved  Float    @default(0)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  year       Int
+  month      Int
+  growthPct  Float    @default(0)
+  target     Float    @default(0)
+  achieved   Float    @default(0)
+  createdAt  DateTime @default(now())
 
   @@unique([userId, year, month])
 }
@@ -213,4 +218,29 @@ model Import {
   records   Int      @default(0)
   errors    Int      @default(0)
   createdAt DateTime @default(now())
+}
+
+enum ProposalStage {
+  SENT
+  ACCEPTED
+  LOST
+}
+
+model Proposal {
+  id           String        @id @default(cuid())
+  customerId   String
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  commercialId String?
+  commercial   User?         @relation("CommercialProposals", fields: [commercialId], references: [id])
+  title        String
+  value        Float
+  stage        ProposalStage @default(SENT)
+  expectedDate DateTime?
+  notes        String?
+  closedAt     DateTime?
+  attachmentName String?
+  attachmentType String?
+  attachmentData String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }

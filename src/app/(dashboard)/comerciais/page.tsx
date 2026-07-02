@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 import PageHeader from '@/components/layout/PageHeader'
+import { usePeriod } from '@/components/PeriodContext'
 
 interface Commercial {
   id: string
@@ -11,7 +12,9 @@ interface Commercial {
   email: string
   role: string
   active: boolean
-  _count: { customers: number; tasks: number; visits: number }
+  orcamento: number
+  vendasAno: number
+  desvio: number | null
 }
 
 export default function ComerciaisPage() {
@@ -20,12 +23,17 @@ export default function ComerciaisPage() {
   const [users, setUsers] = useState<Commercial[]>([])
   const [loading, setLoading] = useState(true)
 
+  const { period, ready } = usePeriod()
+
   useEffect(() => {
     if (role && !['ADMIN', 'DIRECTOR'].includes(role)) return
-    fetch('/api/users?role=COMMERCIAL')
+    if (!ready) return
+    setLoading(true)
+    const qs = period ? `?year=${period.year}` : ''
+    fetch(`/api/comerciais${qs}`, { cache: 'no-store' })
       .then(r => r.json())
-      .then(d => { setUsers(d); setLoading(false) })
-  }, [role])
+      .then(d => { setUsers(Array.isArray(d) ? d : []); setLoading(false) })
+  }, [role, period, ready])
 
   if (role === 'COMMERCIAL') {
     return (
@@ -71,16 +79,21 @@ export default function ComerciaisPage() {
 
                 <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-50">
                   <div className="text-center">
-                    <p className="text-xl font-bold text-gray-900">{user._count.customers}</p>
-                    <p className="text-xs text-gray-500">Clientes</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(user.orcamento)}</p>
+                    <p className="text-xs text-gray-500">Orçamento</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xl font-bold text-gray-900">{user._count.visits}</p>
-                    <p className="text-xs text-gray-500">Visitas</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(user.vendasAno)}</p>
+                    <p className="text-xs text-gray-500">Vendas do ano</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xl font-bold text-gray-900">{user._count.tasks}</p>
-                    <p className="text-xs text-gray-500">Tarefas</p>
+                    <p className={`text-sm font-bold ${
+                      user.desvio === null ? 'text-gray-400'
+                        : user.desvio >= 0 ? 'text-green-600' : 'text-red-500'
+                    }`}>
+                      {user.desvio === null ? '—' : `${user.desvio >= 0 ? '+' : ''}${user.desvio.toFixed(1)}%`}
+                    </p>
+                    <p className="text-xs text-gray-500">Desvio</p>
                   </div>
                 </div>
               </div>
