@@ -9,6 +9,7 @@ export async function GET() {
 
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
   const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
   const commercials = await prisma.user.findMany({
@@ -19,17 +20,17 @@ export async function GET() {
   const [salesByCommercial, tasksByCommercial, visitsByCommercial] = await Promise.all([
     prisma.sale.groupBy({
       by: ['commercialId'],
-      where: { date: { gte: startOfMonth }, commercialId: { not: null } },
+      where: { date: { gte: startOfMonth, lt: startOfNextMonth }, commercialId: { not: null } },
       _sum: { total: true },
     }),
     prisma.task.groupBy({
       by: ['assignedToId'],
-      where: { status: 'COMPLETED', completedAt: { gte: startOfMonth }, assignedToId: { not: null } },
+      where: { status: 'COMPLETED', completedAt: { gte: startOfMonth, lt: startOfNextMonth }, assignedToId: { not: null } },
       _count: { id: true },
     }),
     prisma.visit.groupBy({
       by: ['commercialId'],
-      where: { date: { gte: startOfMonth }, commercialId: { not: null } },
+      where: { date: { gte: startOfMonth, lt: startOfNextMonth }, commercialId: { not: null } },
       _count: { id: true },
     }),
   ])

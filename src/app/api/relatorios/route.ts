@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
   const weekAgo = new Date(now.getTime() - 7 * 86400000)
   const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000)
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
 
   const isDirector = role === 'ADMIN' || role === 'DIRECTOR'
   const userFilter = isDirector ? {} : { id: userId }
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     ] = await Promise.all([
       prisma.sale.aggregate({ where: { commercialId: commercial.id, date: { gte: weekAgo } }, _sum: { total: true }, _count: true }),
       prisma.sale.aggregate({ where: { commercialId: commercial.id, date: { gte: twoWeeksAgo, lt: weekAgo } }, _sum: { total: true } }),
-      prisma.sale.aggregate({ where: { commercialId: commercial.id, date: { gte: startOfMonth } }, _sum: { total: true } }),
+      prisma.sale.aggregate({ where: { commercialId: commercial.id, date: { gte: startOfMonth, lt: startOfNextMonth } }, _sum: { total: true } }),
       prisma.visit.count({ where: { commercialId: commercial.id, date: { gte: weekAgo } } }),
       prisma.visit.count({ where: { commercialId: commercial.id, date: { gte: twoWeeksAgo, lt: weekAgo } } }),
       prisma.task.count({ where: { status: 'COMPLETED', completedAt: { gte: weekAgo }, customer: { commercialId: commercial.id } } }),

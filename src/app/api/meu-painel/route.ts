@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   const year = Number.isFinite(qYear) ? qYear : now.getFullYear()
   const month = Number.isFinite(qMonth) ? qMonth - 1 : now.getMonth() // 0-indexed
   const startOfMonth = new Date(year, month, 1)
+  const startOfNextMonth = new Date(year, month + 1, 1)
   const startOfLastMonth = new Date(year, month - 1, 1)
   const endOfLastMonth = new Date(year, month, 0, 23, 59, 59, 999)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
       recentSales,
       commercialsCount,
     ] = await Promise.all([
-      prisma.sale.aggregate({ where: { date: { gte: startOfMonth } }, _sum: { total: true } }),
+      prisma.sale.aggregate({ where: { date: { gte: startOfMonth, lt: startOfNextMonth } }, _sum: { total: true } }),
       prisma.sale.aggregate({ where: { date: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { total: true } }),
       prisma.commercialTarget.findMany({ where: { year, month: month + 1 }, select: { target: true } }),
       prisma.customer.count({ where: { status: 'ACTIVE' } }),
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
       prisma.visit.count({ where: { date: { gte: startOfWeek, lte: endOfWeek } } }),
       prisma.task.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] } } }),
       prisma.sale.findMany({
-        where: { date: { gte: startOfMonth } },
+        where: { date: { gte: startOfMonth, lt: startOfNextMonth } },
         select: {
           id: true, date: true, total: true,
           customer: { select: { name: true } },
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest) {
     visitsThisWeekRaw,
     recentSales,
   ] = await Promise.all([
-    prisma.sale.aggregate({ where: { commercialId, date: { gte: startOfMonth } }, _sum: { total: true } }),
+    prisma.sale.aggregate({ where: { commercialId, date: { gte: startOfMonth, lt: startOfNextMonth } }, _sum: { total: true } }),
     prisma.sale.aggregate({ where: { commercialId, date: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { total: true } }),
     prisma.commercialTarget.findUnique({
       where: { userId_year_month: { userId: commercialId, year, month: month + 1 } },

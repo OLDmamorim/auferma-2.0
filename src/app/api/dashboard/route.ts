@@ -71,6 +71,7 @@ export async function GET(req: Request) {
 
   const currentYear = selYear
   const startOfMonth = new Date(selYear, selMonth - 1, 1)
+  const startOfNextMonth = new Date(selYear, selMonth, 1)
   const startOfLastMonth = new Date(selYear, selMonth - 2, 1)
   const endOfLastMonth = new Date(selYear, selMonth - 1, 0, 23, 59, 59, 999)
   const startOfLastYear = new Date(currentYear - 1, 0, 1)
@@ -104,7 +105,7 @@ export async function GET(req: Request) {
   ] = await Promise.all([
     // Total sales this month
     prisma.sale.aggregate({
-      where: { date: { gte: startOfMonth }, customer: customerFilter },
+      where: { date: { gte: startOfMonth, lt: startOfNextMonth }, customer: customerFilter },
       _sum: { total: true },
     }),
     // Total sales last month
@@ -136,7 +137,7 @@ export async function GET(req: Request) {
     // Sales by commercial (current month) - only for director/admin
     role !== 'COMMERCIAL' ? prisma.sale.groupBy({
       by: ['commercialId'],
-      where: { date: { gte: startOfMonth } },
+      where: { date: { gte: startOfMonth, lt: startOfNextMonth } },
       _sum: { total: true },
       orderBy: { _sum: { total: 'desc' } },
     }) : Promise.resolve([]),
