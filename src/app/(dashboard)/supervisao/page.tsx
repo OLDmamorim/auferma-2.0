@@ -53,8 +53,8 @@ export default function SupervisaoPage() {
   const fetchData = useCallback(() => {
     if (!ready) return
     setLoading(true)
-    const qs = period ? `?year=${period.year}&month=${period.month}` : ''
-    fetch(`/api/supervisao${qs}`, { cache: 'no-store' }).then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
+    const base = period ? `?year=${period.year}&month=${period.month}&` : '?'
+    fetch(`/api/supervisao${base}_t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
   }, [period, ready])
 
   useEffect(() => { fetchData() }, [fetchData])
