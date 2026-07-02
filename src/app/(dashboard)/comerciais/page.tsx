@@ -29,8 +29,8 @@ export default function ComerciaisPage() {
     if (role && !['ADMIN', 'DIRECTOR'].includes(role)) return
     if (!ready) return
     setLoading(true)
-    const qs = period ? `?year=${period.year}` : ''
-    fetch(`/api/comerciais${qs}`, { cache: 'no-store' })
+    const base = period ? `?year=${period.year}&` : '?'
+    fetch(`/api/comerciais${base}_t=${Date.now()}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { setUsers(Array.isArray(d) ? d : []); setLoading(false) })
   }, [role, period, ready])

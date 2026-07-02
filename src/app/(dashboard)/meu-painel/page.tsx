@@ -215,8 +215,8 @@ export default function MeuPainelPage() {
   useEffect(() => {
     if (!ready) return
     setLoading(true)
-    const qs = period ? `?year=${period.year}&month=${period.month}` : ''
-    fetch(`/api/meu-painel${qs}`, { cache: 'no-store' })
+    const base = period ? `?year=${period.year}&month=${period.month}&` : '?'
+    fetch(`/api/meu-painel${base}_t=${Date.now()}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))

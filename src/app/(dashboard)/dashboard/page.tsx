@@ -53,8 +53,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!ready) return
     setLoading(true)
-    const qs = period ? `?year=${period.year}&month=${period.month}` : ''
-    fetch(`/api/dashboard${qs}`, { cache: 'no-store' })
+    const base = period ? `?year=${period.year}&month=${period.month}&` : '?'
+    fetch(`/api/dashboard${base}_t=${Date.now()}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
