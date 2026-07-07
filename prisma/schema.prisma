@@ -175,18 +175,32 @@ model Visit {
   createdAt    DateTime    @default(now())
 }
 
+// An explicit per-commercial override for a given month. Only exists when a
+// director has set one — its absence means "inherit the TeamTarget default".
 model CommercialTarget {
   id         String   @id @default(cuid())
   userId     String
   user       User     @relation(fields: [userId], references: [id])
   year       Int
   month      Int
-  growthPct  Float    @default(0)
-  target     Float    @default(0)
+  growthPct  Float?
+  target     Float?
   achieved   Float    @default(0)
   createdAt  DateTime @default(now())
 
   @@unique([userId, year, month])
+}
+
+// The team-wide default growth % for a given month, applied to every
+// commercial's own homólogo sales unless they have a CommercialTarget override.
+model TeamTarget {
+  id        String   @id @default(cuid())
+  year      Int
+  month     Int
+  growthPct Float    @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([year, month])
 }
 
 model CustomerScore {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getEffectiveTargets } from '@/lib/targets'
 
 function getPeriodRange(period: string, year: number, month: number) {
   if (period === 'month') {
@@ -86,10 +87,7 @@ export async function GET(req: NextRequest) {
   // Targets (only relevant for month period)
   let targetsMap = new Map<string, number>()
   if (period === 'month') {
-    const targets = await prisma.commercialTarget.findMany({
-      where: { year, month },
-    })
-    targetsMap = new Map(targets.map(t => [t.userId, t.target]))
+    targetsMap = await getEffectiveTargets(year, month)
   }
 
   const salesMap = new Map(salesAgg.map(s => [s.commercialId!, { total: s._sum.total || 0, count: s._count.id }]))

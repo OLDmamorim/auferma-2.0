@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getEffectiveTargets } from '@/lib/targets'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -25,12 +26,14 @@ export async function GET(req: NextRequest) {
     select: { id: true, name: true, email: true },
   })
 
+  const effectiveTargets = await getEffectiveTargets(now.getFullYear(), now.getMonth() + 1, commercials.map(c => c.id))
+
   const reports = await Promise.all(commercials.map(async (commercial) => {
     const [
       salesThisWeek, salesLastWeek, salesThisMonth,
       visitsThisWeek, visitsLastWeek,
       tasksDone, tasksPending,
-      atRiskCustomers, target,
+      atRiskCustomers,
     ] = await Promise.all([
       prisma.sale.aggregate({ where: { commercialId: commercial.id, date: { gte: weekAgo } }, _sum: { total: true }, _count: true }),
       prisma.sale.aggregate({ where: { commercialId: commercial.id, date: { gte: twoWeeksAgo, lt: weekAgo } }, _sum: { total: true } }),
@@ -40,15 +43,15 @@ export async function GET(req: NextRequest) {
       prisma.task.count({ where: { status: 'COMPLETED', completedAt: { gte: weekAgo }, customer: { commercialId: commercial.id } } }),
       prisma.task.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] }, customer: { commercialId: commercial.id } } }),
       prisma.customer.count({ where: { commercialId: commercial.id, status: 'ACTIVE', OR: [{ lastPurchaseDate: { lt: new Date(now.getTime() - 30 * 86400000) } }, { riskScore: { gt: 60 } }] } }),
-      prisma.commercialTarget.findUnique({ where: { userId_year_month: { userId: commercial.id, year: now.getFullYear(), month: now.getMonth() + 1 } } }),
     ])
+    const targetVal = effectiveTargets.get(commercial.id) || 0
 
     const salesWeekVal = salesThisWeek._sum.total || 0
     const salesLastWeekVal = salesLastWeek._sum.total || 0
     const salesMonthVal = salesThisMonth._sum.total || 0
     const salesWoW = salesLastWeekVal > 0 ? ((salesWeekVal - salesLastWeekVal) / salesLastWeekVal) * 100 : 0
     const visitsWoW = visitsLastWeek > 0 ? ((visitsThisWeek - visitsLastWeek) / visitsLastWeek) * 100 : 0
-    const targetPct = target && target.target > 0 ? (salesMonthVal / target.target) * 100 : null
+    const targetPct = targetVal > 0 ? (salesMonthVal / targetVal) * 100 : null
 
     // Performance signal
     let signal: 'green' | 'amber' | 'red' = 'green'
@@ -68,7 +71,7 @@ export async function GET(req: NextRequest) {
       tasksDone,
       tasksPending,
       atRiskCustomers,
-      target: target?.target || 0,
+      target: targetVal,
       targetPct: targetPct !== null ? Math.round(targetPct) : null,
       signal,
     }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getEffectiveTargets } from '@/lib/targets'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -140,15 +141,8 @@ export async function GET(req: Request) {
       },
       _count: { id: true },
     }),
-    // CommercialTarget for the selected month
-    prisma.commercialTarget.findMany({
-      where: {
-        userId: { in: commercialIds },
-        year: selYear,
-        month: selMonth + 1,
-      },
-      select: { userId: true, target: true, achieved: true },
-    }),
+    // Effective target for the selected month (override or team default)
+    getEffectiveTargets(selYear, selMonth + 1, commercialIds),
     // Total active customers per commercial
     prisma.customer.groupBy({
       by: ['commercialId'],
@@ -217,7 +211,7 @@ export async function GET(req: Request) {
   const visitsTodayMap = new Map(visitsTodayCounts.map(r => [r.commercialId!, r._count.id]))
   const tasksDoneMap = new Map(tasksDoneThisWeek.map(r => [r.assignedToId!, r._count.id]))
   const tasksPendingMap = new Map(tasksPending.map(r => [r.assignedToId!, r._count.id]))
-  const targetsMap = new Map(monthTargets.map(r => [r.userId, r]))
+  const targetsMap = monthTargets
   const customersTotalMap = new Map(customersTotalCounts.map(r => [r.commercialId!, r._count.id]))
   const customersAtRiskMap = new Map(customersAtRiskCounts.map(r => [r.commercialId!, r._count.id]))
   const lastVisitMap = new Map(lastVisitDates.map(r => [r.commercialId!, r._max.date]))
@@ -263,7 +257,7 @@ export async function GET(req: Request) {
     }
 
     const salesThisMonth = salesMonthMap.get(id) ?? 0
-    const targetPct = target && target.target > 0 ? (salesThisMonth / target.target) * 100 : null
+    const targetPct = target && target > 0 ? (salesThisMonth / target) * 100 : null
 
     // Alerts for this commercial
     if (lastVisitDate && lastVisitDate < tenDaysAgo) {
@@ -329,7 +323,7 @@ export async function GET(req: Request) {
       visitsToday: visitsTodayMap.get(id) ?? 0,
       tasksDoneThisWeek: tasksDoneMap.get(id) ?? 0,
       tasksPending: tasksPendingMap.get(id) ?? 0,
-      monthTarget: target ? { target: target.target, achieved: salesThisMonth } : null,
+      monthTarget: target ? { target, achieved: salesThisMonth } : null,
       targetPct,
       customersTotal: customersTotalMap.get(id) ?? 0,
       customersAtRisk: customersAtRiskMap.get(id) ?? 0,

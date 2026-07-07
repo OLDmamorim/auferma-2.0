@@ -2,11 +2,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import PageHeader from '@/components/layout/PageHeader'
 import { useSession } from 'next-auth/react'
+import CommercialTargetModal from '@/components/CommercialTargetModal'
 
 interface TargetRow {
   userId: string
   name: string
   growthPct: number
+  hasOverride: boolean
   target: number
   lastYearSales: number
   achieved: number
@@ -28,11 +30,10 @@ export default function TargetsPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [targets, setTargets] = useState<TargetRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState<string | null>(null)
   const [teamGrowthPct, setTeamGrowthPct] = useState<number | null>(null)
   const [globalPctInput, setGlobalPctInput] = useState('')
-  const [individualPcts, setIndividualPcts] = useState<Record<string, string>>({})
   const [applyingAll, setApplyingAll] = useState(false)
+  const [editingUser, setEditingUser] = useState<{ userId: string; name: string } | null>(null)
 
   const canEdit = role === 'ADMIN' || role === 'DIRECTOR'
 
@@ -45,9 +46,6 @@ export default function TargetsPage() {
         setTargets(rows)
         setTeamGrowthPct(d.teamGrowthPct)
         if (d.teamGrowthPct !== null) setGlobalPctInput(String(d.teamGrowthPct))
-        const indiv: Record<string, string> = {}
-        rows.forEach(t => { indiv[t.userId] = String(t.growthPct) })
-        setIndividualPcts(indiv)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -65,19 +63,6 @@ export default function TargetsPage() {
       body: JSON.stringify({ growthPct: pct, year, month, applyToAll: true }),
     })
     setApplyingAll(false)
-    fetchTargets()
-  }
-
-  async function saveIndividual(userId: string) {
-    const pct = parseFloat(individualPcts[userId] || '0')
-    if (isNaN(pct)) return
-    setSaving(userId)
-    await fetch('/api/targets', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, growthPct: pct, year, month }),
-    })
-    setSaving(null)
     fetchTargets()
   }
 
@@ -184,8 +169,19 @@ export default function TargetsPage() {
                 <div className="flex-1 min-w-0">
                   {/* Name + growth badge */}
                   <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                    <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
+                    <button
+                      onClick={() => canEdit && setEditingUser({ userId: t.userId, name: t.name })}
+                      className={`font-semibold text-sm ${canEdit ? 'text-blue-700 hover:underline cursor-pointer' : 'text-gray-900'}`}
+                      title={canEdit ? 'Definir metas mês a mês para este comercial' : undefined}
+                    >
+                      {t.name}
+                    </button>
                     <div className="flex items-center gap-2 flex-wrap">
+                      {t.hasOverride && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                          Meta individual
+                        </span>
+                      )}
                       {t.vsLastYear !== null && (
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${t.vsLastYear >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                           {t.vsLastYear >= 0 ? '↑' : '↓'} {Math.abs(t.vsLastYear)}% vs {year - 1}
@@ -220,30 +216,13 @@ export default function TargetsPage() {
                     <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${barPct}%` }} />
                   </div>
 
-                  {/* Individual % override */}
                   {canEdit && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-400">Crescimento individual:</span>
-                      <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="-100"
-                          className="w-14 text-xs text-gray-700 bg-transparent focus:outline-none"
-                          value={individualPcts[t.userId] ?? ''}
-                          onChange={e => setIndividualPcts(v => ({ ...v, [t.userId]: e.target.value }))}
-                          onBlur={() => saveIndividual(t.userId)}
-                          onKeyDown={e => e.key === 'Enter' && saveIndividual(t.userId)}
-                        />
-                        <span className="text-xs text-gray-500">%</span>
-                      </div>
-                      {saving === t.userId && <span className="text-xs text-blue-500">A guardar...</span>}
-                      {t.lastYearSales > 0 && parseFloat(individualPcts[t.userId] || '0') !== 0 && (
-                        <span className="text-xs text-gray-400">
-                          → Meta: {fmt(t.lastYearSales * (1 + parseFloat(individualPcts[t.userId] || '0') / 100))}
-                        </span>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => setEditingUser({ userId: t.userId, name: t.name })}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Definir metas mês a mês →
+                    </button>
                   )}
                 </div>
               </div>
@@ -262,6 +241,16 @@ export default function TargetsPage() {
             Equipa realiza <strong className={totalVsLastYear >= 0 ? 'text-green-600' : 'text-red-600'}>{totalVsLastYear >= 0 ? '+' : ''}{totalVsLastYear}%</strong> face a {MONTHS[month - 1]} {year - 1} ({fmt(totalLastYear)})
           </p>
         </div>
+      )}
+
+      {editingUser && (
+        <CommercialTargetModal
+          userId={editingUser.userId}
+          name={editingUser.name}
+          year={year}
+          onClose={() => setEditingUser(null)}
+          onSaved={fetchTargets}
+        />
       )}
     </div>
   )

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getEffectiveTargets } from '@/lib/targets'
 
 export interface Alert {
   id: string
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
   // For COMMERCIAL role, only show their own alerts
   const commercialFilter = isDirector ? {} : { id: userId }
 
-  const [commercials, monthTargets, atRiskACustomers] = await Promise.all([
+  const [commercials, effectiveTargets, salesThisMonthByCommercial, atRiskACustomers] = await Promise.all([
     prisma.user.findMany({
       where: { role: 'COMMERCIAL', active: true, ...commercialFilter },
       select: {
@@ -43,9 +44,11 @@ export async function GET(req: NextRequest) {
         },
       },
     }),
-    prisma.commercialTarget.findMany({
-      where: { year: now.getFullYear(), month: now.getMonth() + 1 },
-      include: { user: { select: { id: true, name: true } } },
+    getEffectiveTargets(now.getFullYear(), now.getMonth() + 1),
+    prisma.sale.groupBy({
+      by: ['commercialId'],
+      where: { date: { gte: new Date(now.getFullYear(), now.getMonth(), 1), lt: new Date(now.getFullYear(), now.getMonth() + 1, 1) }, commercialId: { not: null } },
+      _sum: { total: true },
     }),
     // Customers with high value (potential or recent sales) without recent visit
     prisma.customer.findMany({
@@ -127,18 +130,21 @@ export async function GET(req: NextRequest) {
 
   // Target alerts
   if (isDirector && dayOfMonth >= 15) {
-    for (const target of monthTargets) {
-      if (target.target <= 0) continue
-      const pct = (target.achieved / target.target) * 100
+    const achievedMap = new Map(salesThisMonthByCommercial.map(s => [s.commercialId!, s._sum.total || 0]))
+    for (const commercial of commercials) {
+      const target = effectiveTargets.get(commercial.id) || 0
+      if (target <= 0) continue
+      const achieved = achievedMap.get(commercial.id) || 0
+      const pct = (achieved / target) * 100
       if (dayOfMonth >= 20 && pct < 25) {
         alerts.push({
           id: `target-danger-${idCounter++}`,
           type: 'danger',
           category: 'target',
           title: 'Meta muito abaixo do esperado',
-          message: `${target.user.name} atingiu apenas ${pct.toFixed(0)}% da meta a ${dayOfMonth} dias do mês`,
-          commercialId: target.userId,
-          commercialName: target.user.name,
+          message: `${commercial.name} atingiu apenas ${pct.toFixed(0)}% da meta a ${dayOfMonth} dias do mês`,
+          commercialId: commercial.id,
+          commercialName: commercial.name,
           createdAt: now.toISOString(),
         })
       } else if (pct < 50) {
@@ -147,9 +153,9 @@ export async function GET(req: NextRequest) {
           type: 'warning',
           category: 'target',
           title: 'Meta abaixo do ritmo',
-          message: `${target.user.name} está a ${pct.toFixed(0)}% da meta mensal (dia ${dayOfMonth})`,
-          commercialId: target.userId,
-          commercialName: target.user.name,
+          message: `${commercial.name} está a ${pct.toFixed(0)}% da meta mensal (dia ${dayOfMonth})`,
+          commercialId: commercial.id,
+          commercialName: commercial.name,
           createdAt: now.toISOString(),
         })
       }
