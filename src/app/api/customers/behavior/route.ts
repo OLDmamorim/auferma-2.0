@@ -29,6 +29,10 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const userId = (session.user as any).id
+  const role = (session.user as any).role
+  const customerFilter = role === 'COMMERCIAL' ? { commercialId: userId } : {}
+
   const now = new Date()
   const months12ago = new Date(now.getTime() - 365 * 86400000)
   const months24ago = new Date(now.getTime() - 730 * 86400000)
@@ -37,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   const [customers, salesAgg] = await Promise.all([
     prisma.customer.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', ...customerFilter },
       select: {
         id: true,
         name: true,

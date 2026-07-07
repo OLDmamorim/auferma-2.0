@@ -7,6 +7,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const userId = (session.user as any).id
+  const role = (session.user as any).role
+
   const customer = await prisma.customer.findUnique({
     where: { id: params.id },
     include: {
@@ -35,6 +38,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   })
 
   if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (role === 'COMMERCIAL' && customer.commercialId !== userId) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   // Calculate monthly sales for the last 12 months
   const monthlySales = await prisma.$queryRaw`
@@ -55,6 +61,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const userId = (session.user as any).id
+  const role = (session.user as any).role
+
+  if (role === 'COMMERCIAL') {
+    const existing = await prisma.customer.findUnique({ where: { id: params.id }, select: { commercialId: true } })
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (existing.commercialId !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const body = await req.json()
   const customer = await prisma.customer.update({
