@@ -9,7 +9,10 @@ interface RankEntry {
   name: string
   rank: number
   medal: string
-  salesTotal: number
+  hasTarget: boolean
+  attainmentPct: number
+  salesTotal: number | null
+  target: number | null
   tasksCompleted: number
   visitsCount: number
   progress: number
@@ -56,7 +59,7 @@ export default function GamificacaoPage() {
             <div>
               <p className="text-sm font-medium opacity-90">Destaque do Mês</p>
               <p className="text-2xl font-bold">{data.weekHighlight}</p>
-              <p className="text-sm opacity-80 mt-0.5">Melhor vendedor do mês</p>
+              <p className="text-sm opacity-80 mt-0.5">Melhor cumprimento de orçamento do mês</p>
             </div>
           </div>
         </div>
@@ -72,13 +75,17 @@ export default function GamificacaoPage() {
                 <span className="text-4xl">{currentUserRank.medal}</span>
                 <div>
                   <p className="text-2xl font-bold">{currentUserRank.name}</p>
-                  <p className="text-blue-200 text-sm">{formatCurrency(currentUserRank.salesTotal)} em vendas</p>
+                  <p className="text-blue-200 text-sm">
+                    {currentUserRank.hasTarget
+                      ? `${formatCurrency(currentUserRank.salesTotal || 0)} de ${formatCurrency(currentUserRank.target || 0)} de orçamento`
+                      : 'Orçamento não definido para este mês'}
+                  </p>
                 </div>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-blue-200 text-sm">Progresso</p>
-              <p className="text-3xl font-bold">{currentUserRank.progress}%</p>
+              <p className="text-blue-200 text-sm">Cumprimento de orçamento</p>
+              <p className="text-3xl font-bold">{currentUserRank.attainmentPct}%</p>
               <div className="w-32 bg-blue-600 rounded-full h-2 mt-1">
                 <div className="bg-white rounded-full h-2" style={{ width: `${currentUserRank.progress}%` }} />
               </div>
@@ -133,15 +140,19 @@ export default function GamificacaoPage() {
                           style={{ width: `${entry.progress}%` }}
                         />
                       </div>
-                      <span className="text-xs text-gray-500">{entry.progress}%</span>
+                      <span className="text-xs text-gray-500">
+                        {entry.hasTarget ? `${entry.attainmentPct}% do orçamento` : 'sem orçamento definido'}
+                      </span>
                     </div>
                   </div>
 
                   {/* Stats */}
                   <div className="hidden md:grid grid-cols-3 gap-6 text-center">
                     <div>
-                      <p className="text-lg font-bold text-gray-900">{formatCurrency(entry.salesTotal)}</p>
-                      <p className="text-xs text-gray-500">Vendas</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {entry.id === userId ? formatCurrency(entry.salesTotal || 0) : `${entry.attainmentPct}%`}
+                      </p>
+                      <p className="text-xs text-gray-500">{entry.id === userId ? 'Vendas' : 'Orçamento'}</p>
                     </div>
                     <div>
                       <p className="text-lg font-bold text-gray-900">{entry.visitsCount}</p>
@@ -159,7 +170,7 @@ export default function GamificacaoPage() {
 
       {/* Info */}
       <div className="mt-6 bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs text-gray-500">
-        <p>📊 Ranking calculado com base nas vendas, visitas e tarefas concluídas no mês atual. Atualizado em tempo real.</p>
+        <p>📊 Ranking calculado com base no cumprimento do orçamento mensal de cada comercial (não no volume de vendas). Os valores de faturação de cada colega são privados — só vês os teus. Atualizado em tempo real.</p>
       </div>
     </div>
   )
