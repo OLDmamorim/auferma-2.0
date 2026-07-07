@@ -102,23 +102,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <p className="text-xs text-gray-400 text-center mb-3">Contas de demonstração:</p>
-            <div className="grid grid-cols-1 gap-1.5 text-xs text-gray-500">
-              <div className="flex justify-between bg-gray-50 px-3 py-2 rounded-lg">
-                <span className="font-medium">Admin</span>
-                <span>admin@auferma.pt / admin123</span>
-              </div>
-              <div className="flex justify-between bg-gray-50 px-3 py-2 rounded-lg">
-                <span className="font-medium">Diretor</span>
-                <span>diretor@auferma.pt / diretor123</span>
-              </div>
-              <div className="flex justify-between bg-gray-50 px-3 py-2 rounded-lg">
-                <span className="font-medium">Comercial</span>
-                <span>comercial1@auferma.pt / comercial123</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-blue-200/60 text-xs mt-6">
