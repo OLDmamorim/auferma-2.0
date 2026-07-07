@@ -2,6 +2,7 @@ interface KpiCardProps {
   title: string
   value: string | number
   change?: number
+  changeLabel?: string
   icon?: React.ReactNode
   color?: 'blue' | 'green' | 'red' | 'orange' | 'purple'
   subtitle?: string
@@ -15,7 +16,7 @@ const colorMap = {
   purple: 'bg-purple-50 text-purple-700',
 }
 
-export default function KpiCard({ title, value, change, icon, color = 'blue', subtitle }: KpiCardProps) {
+export default function KpiCard({ title, value, change, changeLabel = 'vs mês anterior', icon, color = 'blue', subtitle }: KpiCardProps) {
   return (
     <div className="kpi-card">
       <div className="flex items-start justify-between">
@@ -28,7 +29,7 @@ export default function KpiCard({ title, value, change, icon, color = 'blue', su
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={change >= 0 ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3'} />
               </svg>
-              {Math.abs(change).toFixed(1)}% vs mês anterior
+              {Math.abs(change).toFixed(1)}% {changeLabel}
             </div>
           )}
         </div>

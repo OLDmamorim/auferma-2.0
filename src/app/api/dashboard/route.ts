@@ -25,8 +25,8 @@ function generateDashboardInsights(d: {
     else if (d.yoyChange < 0) insights.push({ type: 'warning', title: 'Ligeira quebra homóloga', body: `Vendas ${Math.abs(d.yoyChange).toFixed(0)}% abaixo do ano anterior. Monitorizar evolução.` })
   }
 
-  if (d.monthChange > 15) insights.push({ type: 'positive', title: 'Mês em aceleração', body: `Vendas do mês ${d.monthChange.toFixed(0)}% acima do mês anterior.` })
-  else if (d.monthChange < -15) insights.push({ type: 'warning', title: 'Mês em desaceleração', body: `Vendas do mês ${Math.abs(d.monthChange).toFixed(0)}% abaixo do mês anterior.` })
+  if (d.monthChange > 15) insights.push({ type: 'positive', title: 'Mês em aceleração', body: `Vendas do mês ${d.monthChange.toFixed(0)}% acima do período homólogo.` })
+  else if (d.monthChange < -15) insights.push({ type: 'warning', title: 'Mês em desaceleração', body: `Vendas do mês ${Math.abs(d.monthChange).toFixed(0)}% abaixo do período homólogo.` })
 
   if (d.targetPct !== null) {
     if (d.targetPct >= 100) insights.push({ type: 'positive', title: 'Orçamento do mês atingido', body: `Equipa já cumpriu ${d.targetPct.toFixed(0)}% do orçamento mensal.` })
@@ -75,6 +75,15 @@ export async function GET(req: Request) {
   const startOfLastMonth = new Date(selYear, selMonth - 2, 1)
   const endOfLastMonth = new Date(selYear, selMonth - 1, 0, 23, 59, 59, 999)
   const startOfLastYear = new Date(currentYear - 1, 0, 1)
+
+  // Homólogo comparison (same month, previous year). If the selected month is the
+  // real current ongoing month, match the cutoff day so partial months compare fairly
+  // (e.g. today 07/07/2026 vs 1-7 July 2025, not the full July 2025).
+  const isOngoingMonth = selYear === now.getFullYear() && selMonth === now.getMonth() + 1
+  const startOfHomologousMonth = new Date(selYear - 1, selMonth - 1, 1)
+  const endOfHomologousMonth = isOngoingMonth
+    ? new Date(selYear - 1, selMonth - 1, now.getDate(), 23, 59, 59, 999)
+    : new Date(selYear - 1, selMonth, 0, 23, 59, 59, 999)
   const startOfThisYear = new Date(currentYear, 0, 1)
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
@@ -89,6 +98,7 @@ export async function GET(req: Request) {
   const [
     totalSalesThisMonth,
     totalSalesLastMonth,
+    totalSalesHomologous,
     totalCustomers,
     activeCustomers,
     atRiskCustomers,
@@ -111,6 +121,11 @@ export async function GET(req: Request) {
     // Total sales last month
     prisma.sale.aggregate({
       where: { date: { gte: startOfLastMonth, lte: endOfLastMonth }, customer: customerFilter },
+      _sum: { total: true },
+    }),
+    // Total sales homólogo (same month, previous year — day-matched if ongoing month)
+    prisma.sale.aggregate({
+      where: { date: { gte: startOfHomologousMonth, lte: endOfHomologousMonth }, customer: customerFilter },
       _sum: { total: true },
     }),
     // Customers count
@@ -217,7 +232,8 @@ export async function GET(req: Request) {
 
   const thisMonthTotal = totalSalesThisMonth._sum.total || 0
   const lastMonthTotal = totalSalesLastMonth._sum.total || 0
-  const monthChange = lastMonthTotal > 0 ? ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 : 0
+  const homologousMonthTotal = totalSalesHomologous._sum.total || 0
+  const monthChange = homologousMonthTotal > 0 ? ((thisMonthTotal - homologousMonthTotal) / homologousMonthTotal) * 100 : 0
 
   // Process top customers — deviation of this year vs homologous (last year)
   const topCustomersSorted = topCustomers
@@ -304,7 +320,11 @@ export async function GET(req: Request) {
     kpis: {
       totalSalesMonth: thisMonthTotal,
       totalSalesLastMonth: lastMonthTotal,
+      homologousMonthTotal,
       monthChange,
+      isOngoingMonth,
+      thisMonthBudget,
+      targetPct,
       totalCustomers,
       activeCustomers,
       atRiskCustomers,
