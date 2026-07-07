@@ -108,6 +108,7 @@ export async function GET(req: Request) {
     salesByCommercial,
     monthlySales,
     monthlyTargets,
+    chartHomologousDayMatched,
     pendingTasks,
     recentVisits,
     lastSaleAgg,
@@ -172,6 +173,13 @@ export async function GET(req: Request) {
       by: ['month'],
       where: { year: currentYear },
       _sum: { target: true },
+    }),
+    // Day-matched homólogo for the real ongoing month, for the "Evolução" chart —
+    // same scope (company-wide) as the raw monthlySales query above, so the two
+    // don't disagree on filtering while only differing in the date cutoff.
+    prisma.sale.aggregate({
+      where: { date: { gte: new Date(now.getFullYear() - 1, now.getMonth(), 1), lte: new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 23, 59, 59, 999) } },
+      _sum: { total: true },
     }),
     // Pending tasks
     prisma.task.count({
@@ -274,10 +282,17 @@ export async function GET(req: Request) {
   const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
   const monthlySeries = Array.from({ length: 12 }, (_, i) => {
     const m = i + 1
+    // For the real ongoing month, compare against the same day-of-month cutoff
+    // last year instead of its full closed total — a partial month vs a full
+    // month otherwise makes "this year" look artificially behind.
+    const isRealOngoingMonth = currentYear === now.getFullYear() && m === now.getMonth() + 1
+    const homologo = isRealOngoingMonth
+      ? (chartHomologousDayMatched._sum.total || 0)
+      : (salesMap.get(`${currentYear - 1}-${m}`) || 0)
     return {
       month: MONTH_NAMES[i],
       total: salesMap.get(`${currentYear}-${m}`) || 0,
-      homologo: salesMap.get(`${currentYear - 1}-${m}`) || 0,
+      homologo,
       orcamento: targetMap.get(m) || 0,
     }
   })
